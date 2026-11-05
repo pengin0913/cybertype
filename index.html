@@ -1,0 +1,4075 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>校園打字專家：電競重構版 (CyberType Academy v2.0)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <div id="root"></div>
+  <script type="text/babel">
+    const createLucideIcon = (name) => ({ className = "w-4 h-4", ...props }) => {
+      const ref = React.useRef(null);
+      React.useEffect(() => {
+        if (ref.current && window.lucide) {
+          window.lucide.createIcons({ root: ref.current });
+        }
+      }, []);
+      const kebab = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+      return <span ref={ref} className="inline-flex items-center justify-center" {...props}><i data-lucide={kebab} className={className}></i></span>;
+    };
+    const Keyboard = createLucideIcon('Keyboard');
+    const Gamepad2 = createLucideIcon('Gamepad2');
+    const Timer = createLucideIcon('Timer');
+    const Type = createLucideIcon('Type');
+    const FolderOpen = createLucideIcon('FolderOpen');
+    const Upload = createLucideIcon('Upload');
+    const Download = createLucideIcon('Download');
+    const Wifi = createLucideIcon('Wifi');
+    const WifiOff = createLucideIcon('WifiOff');
+    const Volume2 = createLucideIcon('Volume2');
+    const VolumeX = createLucideIcon('VolumeX');
+    const Trophy = createLucideIcon('Trophy');
+    const Sparkles = createLucideIcon('Sparkles');
+    const CheckCircle2 = createLucideIcon('CheckCircle2');
+    const XCircle = createLucideIcon('XCircle');
+    const AlertTriangle = createLucideIcon('AlertTriangle');
+    const RotateCcw = createLucideIcon('RotateCcw');
+    const Play = createLucideIcon('Play');
+    const Square = createLucideIcon('Square');
+    const ChevronRight = createLucideIcon('ChevronRight');
+    const Settings = createLucideIcon('Settings');
+    const Database = createLucideIcon('Database');
+    const Send = createLucideIcon('Send');
+    const Users = createLucideIcon('Users');
+    const FileJson = createLucideIcon('FileJson');
+    const Plus = createLucideIcon('Plus');
+    const Info = createLucideIcon('Info');
+    const Zap = createLucideIcon('Zap');
+    const ShieldAlert = createLucideIcon('ShieldAlert');
+    const Award = createLucideIcon('Award');
+    const BarChart3 = createLucideIcon('BarChart3');
+    const BookOpen = createLucideIcon('BookOpen');
+    const Layers = createLucideIcon('Layers');
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+
+// ============================================================================
+// 1. 內建完整預設題庫 (與同目錄外部 JSON 100% 結構相同，作為 Canvas 離線備援)
+// ============================================================================
+const DEFAULT_MANIFEST = {
+  version: '2.0.0',
+  appName: '校園打字專家：電競重構版 (CyberType Academy)',
+  categories: [
+    { id: 'en_finger', title: '英打【鍵盤指法】', lang: 'en', type: 'finger', file: './bank_en_finger.json' },
+    { id: 'zh_bopomofo', title: '中打【鍵盤注音】', lang: 'zh-bopomofo', type: 'finger', file: './bank_zh_bopomofo.json' },
+    { id: 'en_vocab_elem', title: '國小【英文字根字詞】', lang: 'en', type: 'vocab', file: './bank_en_vocab_elem.json' },
+    { id: 'en_vocab_junior', title: '國中【英文字根字詞】', lang: 'en', type: 'vocab', file: './bank_en_vocab_junior.json' },
+    { id: 'en_articles', title: '英打【精選文章看打】', lang: 'en', type: 'article', file: './bank_en_articles.json' },
+    { id: 'zh_articles', title: '中打【精選文章看打】', lang: 'zh', type: 'article', file: './bank_zh_articles.json' }
+  ]
+};
+
+const EMBEDDED_BANKS = {
+  en_finger: {
+    categoryId: 'en_finger',
+    categoryTitle: '英打【鍵盤指法】',
+    lang: 'en',
+    lessons: [
+      {
+        id: 'Q-1',
+        code: 'Q-1',
+        title: 'Q-1: 英打[基準按鍵]指法',
+        description: '左手 A S D F 與右手 J K L ; 基準鍵位肌肉記憶訓練',
+        requiresShiftHint: false,
+        keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';', ' '],
+        words: [
+          'asdf', 'jkl;', 'fdsa', ';lkj', 'as', 'df', 'jk', 'l;',
+          'dad', 'sad', 'lad', 'ask', 'has', 'gas', 'all', 'fall',
+          'hall', 'salad', 'half', 'glass', 'flash', 'flask'
+        ],
+        lines: [
+          'ffjj fjfj asdfg hjkl; asj dfk gfl sd; hjs jkd kla',
+          'a all as ask has gas add had dad lad lag all add',
+          'all fall hall shall half as ask has gas glass flash',
+          'add had dad lad glad flag salad half lag flag glass',
+          'asdf jkl; fdsa ;lkj sad dad ask lad fall hall salad'
+        ]
+      },
+      {
+        id: 'Q-2',
+        code: 'Q-2',
+        title: 'Q-2: 英打[食指按鍵]指法untr',
+        description: '食指延伸鍵位 G H U N T R Y J F V B M 訓練',
+        requiresShiftHint: false,
+        keys: ['u', 'j', 'n', 'm', 'y', 'h', 't', 'g', 'r', 'f', 'v', 'b', ' '],
+        words: [
+          'ujuj', 'njnj', 'ujnj', 'ujaj', 'tftf', 'rfrf', 'tfrf', 'untr',
+          'fun', 'run', 'sun', 'gun', 'hat', 'rat', 'far', 'star',
+          'hand', 'land', 'sand', 'hard', 'turn', 'full', 'talk', 'thank'
+        ],
+        lines: [
+          'ujuj njnj ujnj ujaj tftf rfrf tfrf tfrf untr untr',
+          'u us usa n an and sun t at hut fat r run rat art far',
+          'and hard land sand run fun full talk tank that than',
+          'fast last turn hard star start usual laugh thank stand',
+          'truth trust hunt hurt brunt trunk grunt turnip'
+        ]
+      },
+      {
+        id: 'Q-3',
+        code: 'Q-3',
+        title: 'Q-3: 英打[上列按鍵]指法',
+        description: '上列鍵位 Q W E R T Y U I O P 跨排移動訓練',
+        requiresShiftHint: false,
+        keys: ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', ' '],
+        words: [
+          'qwert', 'yuiop', 'qa', 'ws', 'ed', 'rf', 'tg', 'yh', 'uj', 'ik', 'ol', 'p;',
+          'tree', 'free', 'see', 'red', 'egg', 'new', 'oil', 'door', 'look',
+          'water', 'paper', 'park', 'write', 'quiet', 'power', 'flower'
+        ],
+        lines: [
+          'qwert qa ws ed rf tf yuiop yj uj ik ol p; qwert yuiop',
+          'q quart www was wash egg new date desk red road agree',
+          'yes year yard it ink idea like our oil only door look',
+          'ps pen papa park red read agree the three water where',
+          'father sister apple easy happy angry young king queen'
+        ]
+      },
+      {
+        id: 'Q-4',
+        code: 'Q-4',
+        title: 'Q-4: 英打[下列按鍵]指法',
+        description: '下列鍵位 Z X C V B N M , . / 跨排精準度訓練',
+        requiresShiftHint: false,
+        keys: ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', ' '],
+        words: [
+          'zxcvb', 'nm,./', 'za', 'xs', 'cd', 'vf', 'bf', 'nj', 'mj', ',k', '.l', '/;',
+          'zoo', 'zero', 'lazy', 'ox', 'fox', 'fix', 'six', 'taxi', 'card', 'city',
+          'clock', 'very', 'five', 'give', 'love', 'baby', 'ball', 'music', 'candy'
+        ],
+        lines: [
+          'zxcvb za xs cd vf bf nm,./ nj mj ,k .l /; zxcvb nm,./',
+          'zoo zero lazy ox fox fix six taxi cd card city clock',
+          'very five give love bee bird baby ball nice next neck',
+          'man milk moon music a.m. p.m. mr. color candy school',
+          'brother mother uncle duck rabbit zebra cowboy family'
+        ]
+      },
+      {
+        id: 'Q-5',
+        code: 'Q-5',
+        title: 'Q-5: 英打[綜合指法]練習',
+        description: '全字母 A~Z 綜合連貫練習與基礎核心字彙',
+        requiresShiftHint: false,
+        keys: 'abcdefghijklmnopqrstuvwxyz '.split(''),
+        words: [
+          'abcd', 'efg', 'hij', 'klmn', 'opq', 'rstuv', 'wxyz',
+          'apple', 'angel', 'boy', 'ball', 'car', 'cake', 'dog', 'duck',
+          'egg', 'easy', 'fish', 'flag', 'girl', 'good', 'hand', 'house',
+          'ice', 'idea', 'joy', 'juice', 'key', 'king', 'kite', 'lion'
+        ],
+        lines: [
+          'apple angel boy ball car cake dog duck egg easy fish flag',
+          'girl give good hand house ice idea joy juice key king kind',
+          'leg lady like man milk nice news oil owl pen piano pizza',
+          'queen quick red run rabbit sun sea star tea taxi use uncle',
+          'very voice visit value valid www was win wind window woman',
+          'x-ray ox fox taxi yes young yellow yummy zoo zero zebra'
+        ]
+      },
+      {
+        id: 'Q-6',
+        code: 'Q-6',
+        title: 'Q-6: 英打[數字,符號,大小寫]',
+        description: '頂列數字 0~9、常用標點符號與 Shift / CapsLock 大小寫切換',
+        requiresShiftHint: true,
+        keys: '3SO0 8hen60124579ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%?.,:;'.split(''),
+        words: [
+          '3S', 'O0', '8h', 'en', '60', '2026', 'NT$100', '8:50',
+          'Taipei', 'Taiwan', 'Hello!', 'Good!', '100%', 'A+B=C',
+          'http://', 'www.edu.tw', 'happy@gmail.com'
+        ],
+        lines: [
+          '0 1 1.2 2# 99% 100.5 124-356 8:50 NT$5,000.',
+          "It's Cute! Are you hungry? I'm very hungry.",
+          "How are you? Nice to meet you! Don't give up!",
+          "Mr. Brown work on TCTV. That's Ted's motorcycle.",
+          'http://www.yahoo.com.tw http://www.ebook123.com.tw',
+          'service@ebook123.com.tw happy5566@gmail.com'
+        ]
+      }
+    ]
+  },
+  zh_bopomofo: {
+    categoryId: 'zh_bopomofo',
+    categoryTitle: '中打【鍵盤注音】',
+    lang: 'zh-bopomofo',
+    lessons: [
+      {
+        id: 'ZH-1',
+        code: 'ZH-1',
+        title: 'ZH-1: 中打[中列基準鍵]注音 (ㄇㄋㄎㄑㄕㄘㄨㄜㄠ)',
+        description: '注音中排基準鍵位：ㄇ(A) ㄋ(S) ㄎ(D) ㄑ(F) ㄕ(G) ㄘ(H) ㄨ(J) ㄜ(K) ㄠ(L) ㄤ(;)',
+        requiresShiftHint: false,
+        keys: ['ㄇ', 'ㄋ', 'ㄎ', 'ㄑ', 'ㄕ', 'ㄘ', 'ㄨ', 'ㄜ', 'ㄠ', 'ㄤ', ' '],
+        words: ['ㄇㄨ', 'ㄋㄠ', 'ㄎㄜ', 'ㄑㄨ', 'ㄕㄨ', 'ㄘㄠ', 'ㄨㄛ', 'ㄜㄠ', 'ㄇㄠ', 'ㄋㄨ', 'ㄎㄠ', 'ㄕㄠ'],
+        lines: [
+          'ㄇㄋㄎㄑ ㄨㄜㄠㄤ ㄇㄨ ㄋㄠ ㄎㄜ ㄑㄨ ㄕㄨ ㄘㄠ',
+          '木頭 腦袋 科學 去處 樹木 操場 我們 鵝毛 貓咪 努力'
+        ]
+      },
+      {
+        id: 'ZH-2',
+        code: 'ZH-2',
+        title: 'ZH-2: 中打[上列鍵位]注音 (ㄆㄊㄍㄐㄔㄗㄧㄛㄟㄣ)',
+        description: '注音上排鍵位：ㄆ(Q) ㄊ(W) ㄍ(E) ㄐ(R) ㄔ(T) ㄗ(Y) ㄧ(U) ㄛ(I) ㄟ(O) ㄣ(P)',
+        requiresShiftHint: false,
+        keys: ['ㄆ', 'ㄊ', 'ㄍ', 'ㄐ', 'ㄔ', 'ㄗ', 'ㄧ', 'ㄛ', 'ㄟ', 'ㄣ', ' '],
+        words: ['ㄆㄧ', 'ㄊㄧ', 'ㄍㄜ', 'ㄐㄧ', 'ㄔㄧ', 'ㄗㄧ', 'ㄆㄟ', 'ㄊㄠ', 'ㄍㄠ', 'ㄐㄧㄣ'],
+        lines: [
+          'ㄆㄊㄍㄐㄔ ㄗㄧㄛㄟㄣ ㄆㄧ ㄊㄧ ㄍㄜ ㄐㄧ ㄔㄧ',
+          '皮球 樓梯 唱歌 機器 吃飯 自己 朋友 太陽 高興 今天'
+        ]
+      },
+      {
+        id: 'ZH-3',
+        code: 'ZH-3',
+        title: 'ZH-3: 中打[頂列數字鍵]注音與聲調 (ㄅㄉˇˋㄓˊ˙ㄚㄞㄢㄦ)',
+        description: '頂排數字列注音：ㄅ(1) ㄉ(2) ˇ(3) ˋ(4) ㄓ(5) ˊ(6) ˙(7) ㄚ(8) ㄞ(9) ㄢ(0) ㄦ(-)',
+        requiresShiftHint: false,
+        keys: ['ㄅ', 'ㄉ', 'ˇ', 'ˋ', 'ㄓ', 'ˊ', '˙', 'ㄚ', 'ㄞ', 'ㄢ', 'ㄦ', ' '],
+        words: ['ㄅㄚ', 'ㄉㄚˋ', 'ㄓˇ', 'ㄅㄞˊ', 'ㄉㄢˋ', 'ㄓㄢˋ', 'ㄚˊ', 'ㄞˋ', 'ㄢ', 'ㄦˊ'],
+        lines: [
+          'ㄅㄉㄓㄚㄞㄢㄦ ㄅㄚ ㄉㄚˋ ㄓˇ ㄅㄞˊ ㄉㄢˋ ㄦˊ',
+          '爸爸 大樹 紙張 白雲 雞蛋 車站 愛心 平安 兒童 快樂'
+        ]
+      },
+      {
+        id: 'ZH-4',
+        code: 'ZH-4',
+        title: 'ZH-4: 中打[下列鍵位]注音 (ㄈㄌㄏㄒㄖㄙㄩㄝㄡㄥ)',
+        description: '注音下排鍵位：ㄈ(Z) ㄌ(X) ㄏ(C) ㄒ(V) ㄖ(B) ㄙ(N) ㄩ(M) ㄝ(,) ㄡ(.) ㄥ(/)',
+        requiresShiftHint: false,
+        keys: ['ㄈ', 'ㄌ', 'ㄏ', 'ㄒ', 'ㄖ', 'ㄙ', 'ㄩ', 'ㄝ', 'ㄡ', 'ㄥ', ' '],
+        words: ['ㄈㄟ', 'ㄌㄜˋ', 'ㄏㄜ', 'ㄒㄧ', 'ㄖㄜˋ', 'ㄙㄨ', 'ㄩˊ', 'ㄩㄝˋ', 'ㄏㄡˊ', 'ㄈㄥ'],
+        lines: [
+          'ㄈㄌㄏㄒㄖ ㄙㄩㄝㄡㄥ ㄈㄟ ㄌㄜˋ ㄏㄜ ㄒㄧ ㄩㄝˋ',
+          '飛機 快樂 河水 希望 熱情 森林 小魚 月亮 猴子 春風'
+        ]
+      },
+      {
+        id: 'ZH-5',
+        code: 'ZH-5',
+        title: 'ZH-5: 中打[全鍵盤注音]綜合挑戰',
+        description: '37 個注音符號與四聲調號綜合反應訓練',
+        requiresShiftHint: false,
+        keys: [
+          'ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ',
+          'ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ',
+          'ㄧ','ㄨ','ㄩ','ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ','ㄢ','ㄣ','ㄤ','ㄥ','ㄦ',
+          'ˊ','ˇ','ˋ','˙',' '
+        ],
+        words: ['ㄊㄞˊ', 'ㄨㄢ', 'ㄒㄩㄝˊ', 'ㄒㄧㄠˋ', 'ㄉㄧㄢˋ', 'ㄋㄠˇ', 'ㄎㄜ', 'ㄐㄧˋ', 'ㄨㄟˋ', 'ㄌㄞˊ'],
+        lines: [
+          '台灣 學校 電腦 科技 未來 夢想 智慧 創新 勇氣 合作',
+          '春眠不覺曉 處處聞啼鳥 夜來風雨聲 花落知多少',
+          '白日依山盡 黃河入海流 欲窮千里目 更上一層樓'
+        ]
+      }
+    ]
+  },
+  en_vocab_elem: {
+    categoryId: 'en_vocab_elem',
+    categoryTitle: '國小【英文字根字詞】',
+    lang: 'en',
+    lessons: [
+      {
+        id: 'ELEM-1',
+        code: 'ELEM-1',
+        title: 'ELEM-1: 國小必備核心單字 (A~G)',
+        description: '教育部國中小基本千字表：動物、食物與日常生活篇',
+        requiresShiftHint: false,
+        keys: 'abcdefg'.split(''),
+        words: [
+          'apple', 'angel', 'ant', 'art', 'bag', 'ball', 'banana', 'bear',
+          'bed', 'bee', 'bell', 'bird', 'blue', 'book', 'box', 'boy',
+          'bread', 'bus', 'cake', 'car', 'card', 'cat', 'chair', 'clock',
+          'cloud', 'coat', 'color', 'computer', 'cookie', 'cow', 'cup',
+          'dad', 'dance', 'desk', 'doctor', 'dog', 'doll', 'door',
+          'dress', 'duck', 'ear', 'earth', 'easy', 'egg', 'eight',
+          'eye', 'face', 'family', 'fan', 'farm', 'father', 'fish', 'five',
+          'flag', 'flower', 'food', 'foot', 'fork', 'four', 'friend', 'frog',
+          'fruit', 'game', 'garden', 'gift', 'girl', 'glass', 'goat', 'good', 'green'
+        ],
+        lines: [
+          'apple angel ant art bag ball banana bear bed bee bell bird',
+          'blue book box boy bread bus cake car card cat chair clock',
+          'cloud coat color computer cookie cow cup dad dance desk',
+          'doctor dog doll door dress duck ear earth easy egg eight',
+          'eye face family fan farm father fish five flag flower food',
+          'friend frog fruit game garden gift girl glass goat green'
+        ]
+      },
+      {
+        id: 'ELEM-2',
+        code: 'ELEM-2',
+        title: 'ELEM-2: 國小必備核心單字 (H~P)',
+        description: '教育部國中小基本千字表：家庭、校園與自然篇',
+        requiresShiftHint: false,
+        keys: 'hijklmnop'.split(''),
+        words: [
+          'hair', 'hand', 'happy', 'hat', 'head', 'heart', 'heavy', 'hello',
+          'help', 'hen', 'hero', 'hill', 'home', 'horse', 'hot', 'house',
+          'ice', 'idea', 'ink', 'island', 'jacket', 'jam', 'juice', 'jump',
+          'key', 'kid', 'kind', 'king', 'kitchen', 'kite', 'koala', 'lake',
+          'lamp', 'large', 'late', 'laugh', 'leaf', 'leg', 'lemon', 'letter',
+          'library', 'light', 'lion', 'listen', 'little', 'long', 'look', 'love',
+          'lunch', 'magic', 'map', 'market', 'math', 'meat', 'milk',
+          'monkey', 'moon', 'mother', 'mountain', 'mouse', 'mouth', 'music',
+          'name', 'neck', 'net', 'new', 'nice', 'night', 'nine', 'noodle',
+          'nose', 'notebook', 'nurse', 'ocean', 'office', 'oil', 'old', 'one',
+          'open', 'orange', 'owl', 'page', 'paint', 'panda', 'pants', 'paper',
+          'park', 'party', 'peach', 'pen', 'pencil', 'people', 'pet', 'piano',
+          'picnic', 'picture', 'pie', 'pig', 'pink', 'pizza', 'plane', 'plant'
+        ],
+        lines: [
+          'hand happy hat head heart home horse house ice idea juice',
+          'key kind king kite koala lake lamp laugh leaf lemon library',
+          'lion listen little love lunch magic map market math milk',
+          'monkey moon mother mountain mouse mouth music name night',
+          'noodle nose notebook nurse ocean orange owl panda paper',
+          'park party pencil people piano picnic picture pizza plant'
+        ]
+      }
+    ]
+  },
+  en_vocab_junior: {
+    categoryId: 'en_vocab_junior',
+    categoryTitle: '國中【英文字根字詞】',
+    lang: 'en',
+    lessons: [
+      {
+        id: 'JUN-1',
+        code: 'JUN-1',
+        title: 'JUN-1: 國中進階字根與高頻字彙 (2000字精選)',
+        description: '常見字首 (pre-, re-, un-) 與字根 (-spect, -port, -dict) 實戰詞彙',
+        requiresShiftHint: false,
+        keys: 'abcdefghijklmnopqrstuvwxyz'.split(''),
+        words: [
+          'ability', 'abroad', 'accept', 'accident', 'achieve', 'action', 'activity',
+          'advance', 'adventure', 'advice', 'agreement', 'airplane', 'alphabet',
+          'ambition', 'ancient', 'anyway', 'apartment', 'appear', 'appreciate',
+          'attention', 'available', 'average', 'background', 'balance', 'behavior',
+          'believe', 'benefit', 'biology', 'blanket', 'broadcast', 'business',
+          'calendar', 'campaign', 'captain', 'celebrate', 'century', 'certain',
+          'challenge', 'champion', 'character', 'chemistry', 'choice', 'citizen'
+        ],
+        lines: [
+          'ability abroad accept accident achieve action activity advance',
+          'adventure advice agreement alphabet ambition ancient appreciate',
+          'attention available average background balance behavior believe',
+          'benefit biology broadcast business calendar celebrate century',
+          'challenge champion character chemistry citizen classical climate'
+        ]
+      }
+    ]
+  },
+  en_articles: {
+    categoryId: 'en_articles',
+    categoryTitle: '英打【精選文章看打】',
+    lang: 'en',
+    lessons: [
+      {
+        id: 'EN-ART-1',
+        code: 'EN-ART-1',
+        title: 'EN-ART-1: The Joy of Touch Typing (盲打的樂趣)',
+        description: '訓練英打長句連貫性、大小寫轉換與標點符號節奏',
+        requiresShiftHint: true,
+        keys: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,! '.split(''),
+        words: ['practice', 'makes', 'perfect', 'keyboard', 'rhythm', 'accuracy', 'speed'],
+        lines: [
+          'Touch typing is a skill that helps you write faster and think clearer.',
+          'When your fingers know where every key is, you never have to look down.',
+          'Keep your wrists relaxed and rest your fingers on the home row keys.',
+          'Accuracy is always more important than speed when you first begin.',
+          'With ten minutes of daily practice, your typing speed will soar!'
+        ]
+      },
+      {
+        id: 'EN-ART-2',
+        code: 'EN-ART-2',
+        title: 'EN-ART-2: Exploring the Digital Universe (探索數位宇宙)',
+        description: '結合數字、科技詞彙與完整段落的綜合看打挑戰',
+        requiresShiftHint: true,
+        keys: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,- '.split(''),
+        words: ['digital', 'universe', 'computer', 'science', 'program', 'future', 'coding'],
+        lines: [
+          'Every great program starts with a single line of code on a screen.',
+          'In 2026, students around the world learn to create games and tools.',
+          'By mastering the keyboard, you unlock a superpower for the future.',
+          'Stay curious, keep exploring, and enjoy every keystroke along the way.'
+        ]
+      }
+    ]
+  },
+  zh_articles: {
+    categoryId: 'zh_articles',
+    categoryTitle: '中打【精選文章看打】',
+    lang: 'zh',
+    lessons: [
+      {
+        id: 'ZH-ART-1',
+        code: 'ZH-ART-1',
+        title: 'ZH-ART-1: 海洋之歌與寶島自然 (科普短文)',
+        description: '國小中年級適讀中文逐行看打文章，含全形標點符號',
+        requiresShiftHint: false,
+        keys: ['ㄅ','ㄆ','ㄇ','ㄈ'],
+        words: ['台灣', '海洋', '森林', '黑潮', '珊瑚礁', '自然', '生態', '守護'],
+        lines: [
+          '台灣是一座四面環海的美麗島嶼，擁有豐富多樣的自然生態。',
+          '溫暖的黑潮洋流經過東岸，帶來了成群結隊的飛魚與鯨豚。',
+          '高聳入雲的中央山脈，孕育出茂密的檜木森林與清澈溪流。',
+          '當我們用雙手敲擊鍵盤時，也能透過文字記錄下家鄉的美好。',
+          '珍惜每一分自然資源，讓未來的世代都能看見湛藍的海洋。'
+        ]
+      },
+      {
+        id: 'ZH-ART-2',
+        code: 'ZH-ART-2',
+        title: 'ZH-ART-2: 數位時代的鍵盤飛行員 (資訊素養)',
+        description: '國小高年級適讀科技與打字素養短文，訓練選字穩定度',
+        requiresShiftHint: false,
+        keys: ['ㄉ','ㄊ','ㄋ','ㄌ'],
+        words: ['鍵盤', '飛行員', '正確', '姿勢', '專注', '節奏', '思考', '創造力'],
+        lines: [
+          '在資訊科技日新月異的時代，鍵盤就像是我們探索知識的飛船。',
+          '養成正確的打字姿勢與指法，不僅能保護雙手，更能提升效率。',
+          '打字不需要急躁，穩紮穩打地按下每一個按鍵，錯誤自然會減少。',
+          '當手指與大腦達成默契，你的想法就能順暢地化為螢幕上的篇章。'
+        ]
+      },
+      {
+        id: 'ZH-ART-3',
+        code: 'ZH-ART-3',
+        title: 'ZH-ART-3: 經典唐詩四首精選 (詩詞節奏)',
+        description: '短句節奏明快，適合訓練中文詞組連打與減少選字錯誤',
+        requiresShiftHint: false,
+        keys: ['ㄍ','ㄎ','ㄏ'],
+        words: ['春眠', '啼鳥', '風雨', '白日', '黃河', '千里目', '松下', '白雲'],
+        lines: [
+          '春眠不覺曉，處處聞啼鳥。夜來風雨聲，花落知多少。',
+          '白日依山盡，黃河入海流。欲窮千里目，更上一層樓。',
+          '松下問童子，言師採藥去。只在此山中，雲深不知處。',
+          '千山鳥飛絕，萬徑人蹤滅。孤舟蓑笠翁，獨釣寒江雪。'
+        ]
+      }
+    ]
+  }
+};
+
+// ============================================================================
+// 2. 鍵盤配置、注音映射與十指人體工學色彩系統 (Color-Coded Ergonomics)
+// ============================================================================
+const FINGER_META = {
+  L_PINKY:  { id: 'L_PINKY',  name: '左小指', short: '小指', hand: 'L', idx: 0, color: 'bg-pink-500/25 border-pink-400 text-pink-200', activeBg: 'bg-pink-500 text-slate-950 shadow-[0_0_20px_#ec4899]', dotColor: '#ec4899', badgeBg: 'bg-pink-500/20 text-pink-300 border-pink-500/40' },
+  L_RING:   { id: 'L_RING',   name: '左無名指', short: '無名指', hand: 'L', idx: 1, color: 'bg-sky-500/25 border-sky-400 text-sky-200', activeBg: 'bg-sky-400 text-slate-950 shadow-[0_0_20px_#38bdf8]', dotColor: '#38bdf8', badgeBg: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+  L_MIDDLE: { id: 'L_MIDDLE', name: '左中指', short: '中指', hand: 'L', idx: 2, color: 'bg-emerald-500/25 border-emerald-400 text-emerald-200', activeBg: 'bg-emerald-400 text-slate-950 shadow-[0_0_20px_#34d399]', dotColor: '#34d399', badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  L_INDEX:  { id: 'L_INDEX',  name: '左食指', short: '食指', hand: 'L', idx: 3, color: 'bg-amber-500/25 border-amber-400 text-amber-200', activeBg: 'bg-amber-400 text-slate-950 shadow-[0_0_20px_#fbbf24]', dotColor: '#fbbf24', badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+  THUMB:    { id: 'THUMB',    name: '大拇指 (空白鍵)', short: '大拇指', hand: 'B', idx: 4, color: 'bg-purple-500/25 border-purple-400 text-purple-200', activeBg: 'bg-purple-400 text-slate-950 shadow-[0_0_20px_#c084fc]', dotColor: '#c084fc', badgeBg: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+  R_INDEX:  { id: 'R_INDEX',  name: '右食指', short: '食指', hand: 'R', idx: 5, color: 'bg-orange-500/25 border-orange-400 text-orange-200', activeBg: 'bg-orange-400 text-slate-950 shadow-[0_0_20px_#fb923c]', dotColor: '#fb923c', badgeBg: 'bg-orange-500/20 text-orange-300 border-orange-500/40' },
+  R_MIDDLE: { id: 'R_MIDDLE', name: '右中指', short: '中指', hand: 'R', idx: 6, color: 'bg-emerald-500/25 border-emerald-400 text-emerald-200', activeBg: 'bg-emerald-400 text-slate-950 shadow-[0_0_20px_#34d399]', dotColor: '#34d399', badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  R_RING:   { id: 'R_RING',   name: '右無名指', short: '無名指', hand: 'R', idx: 7, color: 'bg-sky-500/25 border-sky-400 text-sky-200', activeBg: 'bg-sky-400 text-slate-950 shadow-[0_0_20px_#38bdf8]', dotColor: '#38bdf8', badgeBg: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+  R_PINKY:  { id: 'R_PINKY',  name: '右小指', short: '小指', hand: 'R', idx: 8, color: 'bg-pink-500/25 border-pink-400 text-pink-200', activeBg: 'bg-pink-500 text-slate-950 shadow-[0_0_20px_#ec4899]', dotColor: '#ec4899', badgeBg: 'bg-pink-500/20 text-pink-300 border-pink-500/40' }
+};
+
+const KEYBOARD_ROWS = [
+  [
+    { code: 'Backquote', main: '`', shift: '~', zh: '', finger: 'L_PINKY', w: 'w-10' },
+    { code: 'Digit1', main: '1', shift: '!', zh: 'ㄅ', finger: 'L_PINKY', w: 'w-11' },
+    { code: 'Digit2', main: '2', shift: '@', zh: 'ㄉ', finger: 'L_RING', w: 'w-11' },
+    { code: 'Digit3', main: '3', shift: '#', zh: 'ˇ', finger: 'L_MIDDLE', w: 'w-11' },
+    { code: 'Digit4', main: '4', shift: '$', zh: 'ˋ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'Digit5', main: '5', shift: '%', zh: 'ㄓ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'Digit6', main: '6', shift: '^', zh: 'ˊ', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'Digit7', main: '7', shift: '&', zh: '˙', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'Digit8', main: '8', shift: '*', zh: 'ㄚ', finger: 'R_MIDDLE', w: 'w-11' },
+    { code: 'Digit9', main: '9', shift: '(', zh: 'ㄞ', finger: 'R_RING', w: 'w-11' },
+    { code: 'Digit0', main: '0', shift: ')', zh: 'ㄢ', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'Minus', main: '-', shift: '_', zh: 'ㄦ', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'Equal', main: '=', shift: '+', zh: '', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'Backspace', main: 'Backspace', shift: '', zh: '', finger: 'R_PINKY', w: 'w-20 text-xs' }
+  ],
+  [
+    { code: 'Tab', main: 'Tab', shift: '', zh: '', finger: 'L_PINKY', w: 'w-14 text-xs' },
+    { code: 'KeyQ', main: 'Q', shift: 'q', zh: 'ㄆ', finger: 'L_PINKY', w: 'w-11' },
+    { code: 'KeyW', main: 'W', shift: 'w', zh: 'ㄊ', finger: 'L_RING', w: 'w-11' },
+    { code: 'KeyE', main: 'E', shift: 'e', zh: 'ㄍ', finger: 'L_MIDDLE', w: 'w-11' },
+    { code: 'KeyR', main: 'R', shift: 'r', zh: 'ㄐ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'KeyT', main: 'T', shift: 't', zh: 'ㄔ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'KeyY', main: 'Y', shift: 'y', zh: 'ㄗ', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'KeyU', main: 'U', shift: 'u', zh: 'ㄧ', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'KeyI', main: 'I', shift: 'i', zh: 'ㄛ', finger: 'R_MIDDLE', w: 'w-11' },
+    { code: 'KeyO', main: 'O', shift: 'o', zh: 'ㄟ', finger: 'R_RING', w: 'w-11' },
+    { code: 'KeyP', main: 'P', shift: 'p', zh: 'ㄣ', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'BracketLeft', main: '[', shift: '{', zh: '', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'BracketRight', main: ']', shift: '}', zh: '', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'Backslash', main: '\\', shift: '|', zh: '', finger: 'R_PINKY', w: 'w-14' }
+  ],
+  [
+    { code: 'CapsLock', main: 'CapsLock', shift: '', zh: '', finger: 'L_PINKY', w: 'w-18 text-xs' },
+    { code: 'KeyA', main: 'A', shift: 'a', zh: 'ㄇ', finger: 'L_PINKY', w: 'w-11' },
+    { code: 'KeyS', main: 'S', shift: 's', zh: 'ㄋ', finger: 'L_RING', w: 'w-11' },
+    { code: 'KeyD', main: 'D', shift: 'd', zh: 'ㄎ', finger: 'L_MIDDLE', w: 'w-11' },
+    { code: 'KeyF', main: 'F', shift: 'f', zh: 'ㄑ', finger: 'L_INDEX', w: 'w-11', bump: true },
+    { code: 'KeyG', main: 'G', shift: 'g', zh: 'ㄕ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'KeyH', main: 'H', shift: 'h', zh: 'ㄘ', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'KeyJ', main: 'J', shift: 'j', zh: 'ㄨ', finger: 'R_INDEX', w: 'w-11', bump: true },
+    { code: 'KeyK', main: 'K', shift: 'k', zh: 'ㄜ', finger: 'R_MIDDLE', w: 'w-11' },
+    { code: 'KeyL', main: 'L', shift: 'l', zh: 'ㄠ', finger: 'R_RING', w: 'w-11' },
+    { code: 'Semicolon', main: ';', shift: ':', zh: 'ㄤ', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'Quote', main: "'", shift: '"', zh: '', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'Enter', main: 'Enter', shift: '', zh: '', finger: 'R_PINKY', w: 'w-20 text-xs' }
+  ],
+  [
+    { code: 'ShiftLeft', main: 'Shift', shift: '', zh: '', finger: 'L_PINKY', w: 'w-24 text-xs' },
+    { code: 'KeyZ', main: 'Z', shift: 'z', zh: 'ㄈ', finger: 'L_PINKY', w: 'w-11' },
+    { code: 'KeyX', main: 'X', shift: 'x', zh: 'ㄌ', finger: 'L_RING', w: 'w-11' },
+    { code: 'KeyC', main: 'C', shift: 'c', zh: 'ㄏ', finger: 'L_MIDDLE', w: 'w-11' },
+    { code: 'KeyV', main: 'V', shift: 'v', zh: 'ㄒ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'KeyB', main: 'B', shift: 'b', zh: 'ㄖ', finger: 'L_INDEX', w: 'w-11' },
+    { code: 'KeyN', main: 'N', shift: 'n', zh: 'ㄙ', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'KeyM', main: 'M', shift: 'm', zh: 'ㄩ', finger: 'R_INDEX', w: 'w-11' },
+    { code: 'Comma', main: ',', shift: '<', zh: 'ㄝ', finger: 'R_MIDDLE', w: 'w-11' },
+    { code: 'Period', main: '.', shift: '>', zh: 'ㄡ', finger: 'R_RING', w: 'w-11' },
+    { code: 'Slash', main: '/', shift: '?', zh: 'ㄥ', finger: 'R_PINKY', w: 'w-11' },
+    { code: 'ShiftRight', main: 'Shift', shift: '', zh: '', finger: 'R_PINKY', w: 'w-24 text-xs' }
+  ],
+  [
+    { code: 'ControlLeft', main: 'Ctrl', shift: '', zh: '', finger: 'L_PINKY', w: 'w-14 text-xs' },
+    { code: 'AltLeft', main: 'Alt', shift: '', zh: '', finger: 'THUMB', w: 'w-14 text-xs' },
+    { code: 'Space', main: '空白鍵 (大拇指)', shift: ' ', zh: 'ˉ', finger: 'THUMB', w: 'w-72 text-xs font-bold tracking-wider' },
+    { code: 'AltRight', main: 'Alt', shift: '', zh: '', finger: 'THUMB', w: 'w-14 text-xs' },
+    { code: 'ControlRight', main: 'Ctrl', shift: '', zh: '', finger: 'R_PINKY', w: 'w-14 text-xs' }
+  ]
+];
+
+// 建立字元到鍵位的快速索引表
+const CHAR_TO_KEY_MAP = {};
+const CODE_TO_ZH_MAP = {};
+KEYBOARD_ROWS.forEach((row) => {
+  row.forEach((k) => {
+    if (k.code === 'Space') {
+      CHAR_TO_KEY_MAP[' '] = { ...k, needShift: false };
+    } else if (k.main.length === 1) {
+      // 英文字母或符號
+      if (/^[A-Z]$/.test(k.main)) {
+        CHAR_TO_KEY_MAP[k.main.toLowerCase()] = { ...k, needShift: false };
+        CHAR_TO_KEY_MAP[k.main] = { ...k, needShift: true, shiftKey: k.finger.startsWith('L_') ? 'ShiftRight' : 'ShiftLeft' };
+      } else {
+        CHAR_TO_KEY_MAP[k.main] = { ...k, needShift: false };
+        if (k.shift) {
+          CHAR_TO_KEY_MAP[k.shift] = { ...k, needShift: true, shiftKey: k.finger.startsWith('L_') ? 'ShiftRight' : 'ShiftLeft' };
+        }
+      }
+    }
+    if (k.zh) {
+      CHAR_TO_KEY_MAP[k.zh] = { ...k, needShift: false };
+      CODE_TO_ZH_MAP[k.code] = k.zh;
+    }
+  });
+});
+
+// ============================================================================
+// 3. Web Audio 電競合成音效引擎 (免外部音檔，純合成機械鍵盤與電競回饋音)
+// ============================================================================
+class CyberSoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+  }
+
+  init() {
+    if (!this.ctx && typeof window !== 'undefined') {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  playClick() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(650, now);
+    osc.frequency.exponentialRampToValueAtTime(180, now + 0.035);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  playHit(combo = 1) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const baseFreq = Math.min(440 + combo * 28, 1200);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.4, now + 0.09);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.11);
+  }
+
+  playLaser() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(920, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.14);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.16);
+  }
+
+  playError() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.setValueAtTime(125, now + 0.08);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.23);
+  }
+
+  playFanfare() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, idx) => {
+      const now = this.ctx.currentTime + idx * 0.09;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.24);
+    });
+  }
+}
+
+const soundEngine = new CyberSoundEngine();
+
+// ============================================================================
+// 4. 智慧交叉比對演算法 (Wagner-Fischer / Damerau-Levenshtein LCS 對齊)
+//    100% 還原影片 04:53 的符號系統：
+//    `*` 打錯、`-` 漏打、`+` 多打、`@@` 顛倒打字、`←` 或 `▽` 最後打字位置
+// ============================================================================
+function analyzeSmartLineDiff(targetLine, typedLine, isLastTypedLine = false) {
+  const T = Array.from(targetLine || '');
+  const U = Array.from(typedLine || '');
+  const m = T.length;
+  const n = U.length;
+
+  // 若完全未輸入該行
+  if (n === 0) {
+    return {
+      targetText: targetLine,
+      typedText: '',
+      markerLine: '',
+      alignedTypedLine: '',
+      correct: 0,
+      wrong: 0,
+      missing: 0,
+      extra: 0,
+      transposed: 0,
+      score: 0,
+      tokens: []
+    };
+  }
+
+  // 在逐行看打中，若該行是最後一行且尚未打完，只比對到學生目前打到的對應範圍（不將後面未打完的字算作漏打）
+  // 但若已經換行（非最後一行），則整行未打完的部分算漏打，或者智慧截斷尾端未打部分
+  const effectiveM = isLastTypedLine ? Math.min(m, Math.max(n, Math.min(m, n + 2))) : m;
+  const subT = T.slice(0, effectiveM);
+
+  const dp = Array.from({ length: effectiveM + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= effectiveM; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= effectiveM; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (subT[i - 1] === U[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(
+          dp[i - 1][j - 1], // 替換 (打錯 *)
+          dp[i - 1][j],     // 刪除 (漏打 -)
+          dp[i][j - 1]      // 插入 (多打 +)
+        );
+      }
+    }
+  }
+
+  // 回溯找出對齊操作序列
+  let i = effectiveM;
+  let j = n;
+  const ops = [];
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && subT[i - 1] === U[j - 1]) {
+      ops.push({ type: 'match', tChar: subT[i - 1], uChar: U[j - 1] });
+      i--;
+      j--;
+    } else if (i > 0 && j > 0 && dp[i][j] === dp[i - 1][j - 1] + 1) {
+      ops.push({ type: 'sub', tChar: subT[i - 1], uChar: U[j - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j] === dp[i][j - 1] + 1)) {
+      ops.push({ type: 'extra', tChar: ' ', uChar: U[j - 1] });
+      j--;
+    } else {
+      ops.push({ type: 'missing', tChar: subT[i - 1], uChar: '-' });
+      i--;
+    }
+  }
+  ops.reverse();
+
+  // 偵測相鄰顛倒錯字 (`@@`)：若連續兩個 sub 且互為顛倒 (t1===u2 && t2===u1)
+  for (let k = 0; k < ops.length - 1; k++) {
+    if (
+      ops[k].type === 'sub' &&
+      ops[k + 1].type === 'sub' &&
+      ops[k].tChar === ops[k + 1].uChar &&
+      ops[k + 1].tChar === ops[k].uChar
+    ) {
+      ops[k].type = 'transposed';
+      ops[k + 1].type = 'transposed';
+      k++;
+    }
+  }
+
+  let correct = 0;
+  let wrong = 0;
+  let missing = 0;
+  let extra = 0;
+  let transposed = 0;
+
+  let alignedTargetStr = '';
+  let alignedTypedStr = '';
+  const tokens = [];
+
+  ops.forEach((op) => {
+    if (op.type === 'match') {
+      correct++;
+      alignedTargetStr += op.tChar;
+      alignedTypedStr += op.uChar;
+      tokens.push({ ...op, symbol: ' ' });
+    } else if (op.type === 'transposed') {
+      wrong++;
+      transposed++;
+      alignedTargetStr += op.tChar;
+      alignedTypedStr += '@';
+      tokens.push({ ...op, symbol: '@' });
+    } else if (op.type === 'sub') {
+      wrong++;
+      alignedTargetStr += op.tChar;
+      alignedTypedStr += '*';
+      tokens.push({ ...op, symbol: '*' });
+    } else if (op.type === 'missing') {
+      missing++;
+      alignedTargetStr += op.tChar;
+      alignedTypedStr += '-';
+      tokens.push({ ...op, symbol: '-' });
+    } else if (op.type === 'extra') {
+      extra++;
+      alignedTargetStr += ' ';
+      alignedTypedStr += '+';
+      tokens.push({ ...op, symbol: '+' });
+    }
+  });
+
+  // 補上最後一行未打完的原題目字元供對照顯示
+  if (effectiveM < m) {
+    const rest = T.slice(effectiveM).join('');
+    alignedTargetStr += rest;
+    if (isLastTypedLine) {
+      alignedTypedStr += '←';
+    }
+  } else if (isLastTypedLine) {
+    alignedTypedStr += '←';
+  }
+
+  const lineScore = Math.max(0, correct - wrong - missing - extra);
+
+  return {
+    targetText: alignedTargetStr,
+    typedText: typedLine,
+    alignedTypedLine: alignedTypedStr,
+    correct,
+    wrong,
+    missing,
+    extra,
+    transposed,
+    score: lineScore,
+    tokens
+  };
+}
+
+// ============================================================================
+// 5. 虛擬鍵盤與雙手十指視覺引導元件 (支援英打、大小寫 Shift 與中打注音)
+// ============================================================================
+function CyberVirtualKeyboard({ targetChar, lang, lastWrongKey }) {
+  const keyInfo = targetChar ? CHAR_TO_KEY_MAP[targetChar] : null;
+  const activeCode = keyInfo ? keyInfo.code : null;
+  const activeShiftCode = keyInfo && keyInfo.needShift ? keyInfo.shiftKey : null;
+  const activeFinger = keyInfo ? FINGER_META[keyInfo.finger] : null;
+
+  return (
+    <div className="w-full select-none">
+      {/* 虛擬鍵盤主體 */}
+      <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 sm:p-4 shadow-2xl backdrop-blur-md">
+        <div className="flex flex-col gap-1.5 items-center">
+          {KEYBOARD_ROWS.map((row, rIdx) => (
+            <div key={rIdx} className="flex gap-1.5 justify-center w-full">
+              {row.map((k) => {
+                const fMeta = FINGER_META[k.finger];
+                const isTarget = k.code === activeCode || k.code === activeShiftCode;
+                const isWrong = lastWrongKey && (k.main.toLowerCase() === lastWrongKey.toLowerCase() || k.zh === lastWrongKey);
+
+                return (
+                  <div
+                    key={k.code}
+                    className={`relative h-11 sm:h-12 ${k.w} rounded-lg border flex flex-col justify-between p-1.5 transition-all duration-150 ${
+                      isTarget
+                        ? `${fMeta.activeBg} scale-105 z-10 font-extrabold ring-2 ring-white`
+                        : isWrong
+                        ? 'bg-rose-600 text-white border-rose-300 animate-pulse scale-95'
+                        : `${fMeta.color} hover:brightness-125`
+                    }`}
+                  >
+                    <div className="flex justify-between items-start w-full leading-none">
+                      <span className="text-[11px] sm:text-xs font-mono opacity-85">{k.main}</span>
+                      {k.zh && (
+                        <span className={`text-[11px] sm:text-xs font-bold ${lang === 'zh-bopomofo' ? 'scale-110 text-cyan-200' : 'opacity-65'}`}>
+                          {k.zh}
+                        </span>
+                      )}
+                    </div>
+                    {k.shift && k.main.length === 1 && !/^[A-Z]$/.test(k.main) && (
+                      <span className="text-[10px] opacity-60 leading-none">{k.shift}</span>
+                    )}
+                    {/* F 與 J 定位凸起橫槓 */}
+                    {k.bump && (
+                      <div className={`w-3.5 h-0.5 mx-auto rounded-full ${isTarget ? 'bg-slate-950' : 'bg-white/70'}`} />
+                    )}
+                    {/* 擊鍵目標準星指示 */}
+                    {isTarget && (
+                      <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-white text-slate-950 flex items-center justify-center text-[9px] font-black shadow">
+                        ●
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* 下方十指色彩編碼對應列 (還原影片底部：小指 無名指 中指 食指 大拇指 食指 中指 無名指 小指) */}
+        <div className="mt-3 pt-2.5 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 mx-auto">
+            {[
+              FINGER_META.L_PINKY,
+              FINGER_META.L_RING,
+              FINGER_META.L_MIDDLE,
+              FINGER_META.L_INDEX,
+              FINGER_META.THUMB,
+              FINGER_META.R_INDEX,
+              FINGER_META.R_MIDDLE,
+              FINGER_META.R_RING,
+              FINGER_META.R_PINKY
+            ].map((f, idx) => {
+              const isCurrentFinger = activeFinger && activeFinger.id === f.id;
+              return (
+                <div
+                  key={idx}
+                  className={`px-2.5 py-1 rounded-md border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    isCurrentFinger
+                      ? `${f.activeBg} scale-110 ring-2 ring-white`
+                      : `${f.badgeBg} opacity-75`
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: f.dotColor }} />
+                  <span>{f.short}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 雙手十指 SVG 動態光點指示器 (還原影片右側雙手紫點提示)
+function CyberHandsIndicator({ targetChar, feedbackStatus }) {
+  const keyInfo = targetChar ? CHAR_TO_KEY_MAP[targetChar] : null;
+  const activeFingerId = keyInfo ? keyInfo.finger : null;
+  const needShift = keyInfo ? keyInfo.needShift : false;
+  const shiftFingerId = keyInfo && keyInfo.needShift
+    ? (keyInfo.finger.startsWith('L_') ? 'R_PINKY' : 'L_PINKY')
+    : null;
+
+  const leftFingers = [
+    { id: 'L_PINKY', label: '左小', x: 18, y: 38, h: 34 },
+    { id: 'L_RING', label: '左無', x: 34, y: 24, h: 46 },
+    { id: 'L_MIDDLE', label: '左中', x: 50, y: 18, h: 52 },
+    { id: 'L_INDEX', label: '左食', x: 66, y: 26, h: 44 },
+    { id: 'THUMB', label: '左拇', x: 84, y: 52, h: 28 }
+  ];
+
+  const rightFingers = [
+    { id: 'THUMB', label: '右拇', x: 16, y: 52, h: 28 },
+    { id: 'R_INDEX', label: '右食', x: 34, y: 26, h: 44 },
+    { id: 'R_MIDDLE', label: '右中', x: 50, y: 18, h: 52 },
+    { id: 'R_RING', label: '右無', x: 66, y: 24, h: 46 },
+    { id: 'R_PINKY', label: '右小', x: 82, y: 38, h: 34 }
+  ];
+
+  return (
+    <div className="bg-slate-900/80 border border-slate-700/80 rounded-xl p-3 flex flex-col items-center justify-between h-full">
+      <div className="text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
+        {feedbackStatus === 'correct' ? (
+          <span className="text-emerald-400 flex items-center gap-1 animate-bounce">
+            <CheckCircle2 className="w-4 h-4" /> 答對了！下一題..
+          </span>
+        ) : feedbackStatus === 'wrong' ? (
+          <span className="text-rose-400 flex items-center gap-1 animate-shake">
+            <XCircle className="w-4 h-4" /> 嗚~嗚~答錯了！
+          </span>
+        ) : (
+          <span className="text-cyan-300">
+            {activeFingerId ? `請用【${FINGER_META[activeFingerId]?.name}】` : '雙手預備定位'}
+            {needShift && ' + 另一手【小指 Shift】'}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-4 my-1">
+        {/* 左手 */}
+        <svg width="96" height="92" viewBox="0 0 100 100" className="overflow-visible">
+          <rect x="20" y="62" width="56" height="30" rx="14" className="fill-slate-800 stroke-slate-600" strokeWidth="2" />
+          {leftFingers.map((f) => {
+            const isActive = activeFingerId === f.id || shiftFingerId === f.id;
+            const meta = FINGER_META[f.id];
+            return (
+              <g key={f.id}>
+                <rect
+                  x={f.x - 6}
+                  y={f.y}
+                  width="12"
+                  height={f.h}
+                  rx="6"
+                  className={isActive ? 'fill-slate-700 stroke-white' : 'fill-slate-800 stroke-slate-600'}
+                  strokeWidth="2"
+                />
+                {isActive && (
+                  <>
+                    <circle cx={f.x} cy={f.y + 8} r="7" fill={meta.dotColor} className="animate-ping opacity-75" />
+                    <circle cx={f.x} cy={f.y + 8} r="6" fill={meta.dotColor} stroke="#fff" strokeWidth="1.5" />
+                  </>
+                )}
+              </g>
+            );
+          })}
+          <text x="48" y="82" textAnchor="middle" className="fill-slate-400 text-[10px] font-bold">LEFT</text>
+        </svg>
+
+        {/* 右手 */}
+        <svg width="96" height="92" viewBox="0 0 100 100" className="overflow-visible">
+          <rect x="24" y="62" width="56" height="30" rx="14" className="fill-slate-800 stroke-slate-600" strokeWidth="2" />
+          {rightFingers.map((f) => {
+            const isActive = activeFingerId === f.id || shiftFingerId === f.id;
+            const meta = FINGER_META[f.id];
+            return (
+              <g key={f.id}>
+                <rect
+                  x={f.x - 6}
+                  y={f.y}
+                  width="12"
+                  height={f.h}
+                  rx="6"
+                  className={isActive ? 'fill-slate-700 stroke-white' : 'fill-slate-800 stroke-slate-600'}
+                  strokeWidth="2"
+                />
+                {isActive && (
+                  <>
+                    <circle cx={f.x} cy={f.y + 8} r="7" fill={meta.dotColor} className="animate-ping opacity-75" />
+                    <circle cx={f.x} cy={f.y + 8} r="6" fill={meta.dotColor} stroke="#fff" strokeWidth="1.5" />
+                  </>
+                )}
+              </g>
+            );
+          })}
+          <text x="52" y="82" textAnchor="middle" className="fill-slate-400 text-[10px] font-bold">RIGHT</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 6. 主應用程式元件 (App)
+// ============================================================================
+function App() {
+  // 導覽畫面狀態：'splash' (啟動連線選擇) | 'hub' (四大模式戰術大廳) | 'key_drill' (鍵盤遊戲) | 'word_drill' (字例練習) | 'space_game' (打字遊戲) | 'timed_exam' (計時測驗)
+  const [screen, setScreen] = useState('splash');
+
+  // 音效開關
+  const [muted, setMuted] = useState(false);
+  const toggleMute = () => {
+    soundEngine.muted = !muted;
+    setMuted(!muted);
+  };
+
+  // 題庫動態載入管理狀態 (同目錄 manifest.json 與各別題庫 JSON)
+  const [manifest, setManifest] = useState(DEFAULT_MANIFEST);
+  const [banks, setBanks] = useState(EMBEDDED_BANKS);
+  const [loadStatus, setLoadStatus] = useState({ mode: 'hybrid', loadedFiles: 6, lastSync: '同目錄題庫已就緒' });
+  const [showBankModal, setShowBankModal] = useState(false);
+
+  // 當前選中的主分類與子課程
+  const [selectedCatId, setSelectedCatId] = useState('en_finger');
+  const [selectedLessonId, setSelectedLessonId] = useState('Q-1');
+
+  // 方案 C 預留：師生連線與學生個人資訊狀態
+  const [connectionMode, setConnectionMode] = useState('standalone'); // 'standalone' | 'teacher_sync'
+  const [studentProfile, setStudentProfile] = useState({
+    classId: '601',
+    seatNo: '01',
+    name: '電競學員',
+    serverUrl: 'ws://192.168.1.100:8080/cybertype-classroom',
+    roomCode: 'EDU-2026'
+  });
+  const [showTeacherPanel, setShowTeacherPanel] = useState(false);
+  const [scoreHistory, setScoreHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cybertype_scores_v2');
+      return saved ? JSON.parse(saved) : [
+        { id: 'demo-1', timestamp: '11:26:05', student: '601-01 電競學員', mode: '鍵盤遊戲', lesson: 'Q-5s', speed: '22 鍵/分', errorRate: '0%', score: 100, synced: true },
+        { id: 'demo-2', timestamp: '11:28:40', student: '601-01 電競學員', mode: '打字遊戲', lesson: 'Q-5g3', speed: '18 字/分', errorRate: '10%', score: 432, synced: true }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  // 嘗試從同目錄動態載入 ./manifest.json 與各題庫檔案 (若在真實網頁伺服器環境會自動讀取最新檔案)
+  const probeSameDirectoryFiles = useCallback(async () => {
+    try {
+      const manifestUrl = ['.', 'manifest.json'].join('/');
+      const res = await window.fetch(manifestUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Sandbox environment');
+      const remoteManifest = await res.json();
+      if (remoteManifest && Array.isArray(remoteManifest.categories)) {
+        setManifest(remoteManifest);
+        const loadedBanks = { ...EMBEDDED_BANKS };
+        let count = 0;
+        for (const cat of remoteManifest.categories) {
+          try {
+            const bRes = await window.fetch(cat.file, { cache: 'no-store' });
+            if (bRes.ok) {
+              loadedBanks[cat.id] = await bRes.json();
+              count++;
+            }
+          } catch {
+            // 保留內建備援
+          }
+        }
+        setBanks(loadedBanks);
+        setLoadStatus({
+          mode: 'external',
+          loadedFiles: count,
+          lastSync: `已從同目錄動態載入 ${count} 個外部題庫檔`
+        });
+      }
+    } catch {
+      setLoadStatus({
+        mode: 'embedded_ready',
+        loadedFiles: Object.keys(banks).length,
+        lastSync: '同目錄題庫架構已啟用（可隨時掛載外部 .json/.txt 題庫）'
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    probeSameDirectoryFiles();
+  }, [probeSameDirectoryFiles]);
+
+  // 取得目前啟用的題庫與課程物件
+  const currentCategory = useMemo(() => {
+    return banks[selectedCatId] || Object.values(banks)[0];
+  }, [banks, selectedCatId]);
+
+  const currentLesson = useMemo(() => {
+    if (!currentCategory || !currentCategory.lessons) return null;
+    return currentCategory.lessons.find((l) => l.id === selectedLessonId) || currentCategory.lessons[0];
+  }, [currentCategory, selectedLessonId]);
+
+  // 當切換主分類時，自動選取該分類的第一個子課程
+  const handleSelectCategory = (catId) => {
+    setSelectedCatId(catId);
+    const targetBank = banks[catId];
+    if (targetBank && targetBank.lessons && targetBank.lessons.length > 0) {
+      setSelectedLessonId(targetBank.lessons[0].id);
+    }
+  };
+
+  // 記錄成績並同步至方案 C 教師收集器佇列
+  const recordSessionScore = useCallback((record) => {
+    soundEngine.playFanfare();
+    const newEntry = {
+      id: `rec-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
+      student: `${studentProfile.classId}-${studentProfile.seatNo} ${studentProfile.name}`,
+      synced: connectionMode === 'teacher_sync',
+      ...record
+    };
+    setScoreHistory((prev) => {
+      const updated = [newEntry, ...prev];
+      try {
+        localStorage.setItem('cybertype_scores_v2', JSON.stringify(updated));
+      } catch {
+        // ignore storage error
+      }
+      return updated;
+    });
+  }, [studentProfile, connectionMode]);
+
+  // 處理使用者從本機同目錄選取或上傳 .json / .txt 題庫檔熱掛載
+  const handleHotMountFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const updatedBanks = { ...banks };
+    const updatedCategories = [...manifest.categories];
+    let importedCount = 0;
+
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        if (file.name === 'manifest.json') {
+          const parsedManifest = JSON.parse(text);
+          if (parsedManifest.categories) {
+            setManifest(parsedManifest);
+          }
+          continue;
+        }
+        if (file.name.endsWith('.json')) {
+          const data = JSON.parse(text);
+          if (data.categoryId && Array.isArray(data.lessons)) {
+            updatedBanks[data.categoryId] = data;
+            if (!updatedCategories.some((c) => c.id === data.categoryId)) {
+              updatedCategories.push({
+                id: data.categoryId,
+                title: data.categoryTitle || file.name.replace('.json', ''),
+                lang: data.lang || 'en',
+                type: 'custom',
+                file: `./${file.name}`
+              });
+            }
+            importedCount++;
+          }
+        } else if (file.name.endsWith('.txt')) {
+          // 支援純文字題庫自動轉換為可練習的課程
+          const rawLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+          if (rawLines.length > 0) {
+            const customCatId = 'custom_mounted';
+            const existingCat = updatedBanks[customCatId] || {
+              categoryId: customCatId,
+              categoryTitle: '自訂【外部掛載題庫】',
+              lang: /[\u4e00-\u9fa5]/.test(text) ? 'zh' : 'en',
+              lessons: []
+            };
+            const words = rawLines.join(' ').split(/\s+/).filter(Boolean);
+            const chars = Array.from(new Set(rawLines.join('').split('')));
+            const lessonCode = `EXT-${existingCat.lessons.length + 1}`;
+            existingCat.lessons.push({
+              id: lessonCode,
+              code: lessonCode,
+              title: `${lessonCode}: ${file.name.replace('.txt', '')}`,
+              description: `由同目錄外部文字檔 ${file.name} 動態載入`,
+              requiresShiftHint: false,
+              keys: chars.slice(0, 40),
+              words: words.slice(0, 120),
+              lines: rawLines
+            });
+            updatedBanks[customCatId] = existingCat;
+            if (!updatedCategories.some((c) => c.id === customCatId)) {
+              updatedCategories.push({
+                id: customCatId,
+                title: '自訂【外部掛載題庫】',
+                lang: existingCat.lang,
+                type: 'custom',
+                file: `./${file.name}`
+              });
+            }
+            importedCount++;
+          }
+        }
+      } catch {
+        // ignore invalid file
+      }
+    }
+
+    if (importedCount > 0) {
+      setBanks(updatedBanks);
+      setManifest((prev) => ({ ...prev, categories: updatedCategories }));
+      setLoadStatus({
+        mode: 'hot_mounted',
+        loadedFiles: Object.keys(updatedBanks).length,
+        lastSync: `成功熱掛載 ${importedCount} 個外部題庫檔！`
+      });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+      {/* 頂部全域電競狀態導覽列 */}
+      <header className="bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setScreen('hub')}
+            className="flex items-center gap-2.5 group text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-slate-950 font-black shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-105 transition">
+              <Keyboard className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold tracking-tight text-base text-white">校園打字專家</span>
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  CyberType v2.0
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                {currentCategory?.categoryTitle} ▸ {currentLesson?.title}
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* 右側狀態與快速控制按鈕 */}
+        <div className="flex items-center gap-2">
+          {/* 同目錄題庫管理按鈕 */}
+          <button
+            onClick={() => setShowBankModal(true)}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 text-cyan-300 transition"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>同目錄題庫中心 ({Object.keys(banks).length})</span>
+          </button>
+
+          {/* 方案 C 預留：師生連線與成績收集中心 */}
+          <button
+            onClick={() => setShowTeacherPanel(true)}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition ${
+              connectionMode === 'teacher_sync'
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+            }`}
+          >
+            {connectionMode === 'teacher_sync' ? (
+              <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            ) : (
+              <WifiOff className="w-3.5 h-3.5 text-slate-400" />
+            )}
+            <span>{connectionMode === 'teacher_sync' ? `已連線 (${studentProfile.roomCode})` : '單機練習模式'}</span>
+          </button>
+
+          {/* 音效切換 */}
+          <button
+            onClick={toggleMute}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition"
+            title={muted ? '開啟電競音效' : '靜音'}
+          >
+            {muted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
+          </button>
+
+          {screen !== 'hub' && screen !== 'splash' && (
+            <button
+              onClick={() => setScreen('hub')}
+              className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition"
+            >
+              返回大廳
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* 主內容視圖路由 */}
+      <main className="flex-1 flex flex-col max-w-6xl w-full mx-auto p-3 sm:p-5">
+        {screen === 'splash' && (
+          <SplashView
+            connectionMode={connectionMode}
+            setConnectionMode={setConnectionMode}
+            studentProfile={studentProfile}
+            setStudentProfile={setStudentProfile}
+            onEnterHub={() => {
+              soundEngine.playFanfare();
+              setScreen('hub');
+            }}
+          />
+        )}
+
+        {screen === 'hub' && (
+          <TacticalHubView
+            manifest={manifest}
+            banks={banks}
+            selectedCatId={selectedCatId}
+            onSelectCategory={handleSelectCategory}
+            selectedLessonId={selectedLessonId}
+            onSelectLesson={setSelectedLessonId}
+            currentCategory={currentCategory}
+            currentLesson={currentLesson}
+            onStartMode={(mode) => {
+              soundEngine.playClick();
+              setScreen(mode);
+            }}
+            onOpenBankModal={() => setShowBankModal(true)}
+            scoreHistory={scoreHistory}
+          />
+        )}
+
+        {screen === 'key_drill' && currentLesson && (
+          <KeyboardDrillModule
+            category={currentCategory}
+            lesson={currentLesson}
+            onBack={() => setScreen('hub')}
+            onSaveScore={recordSessionScore}
+          />
+        )}
+
+        {screen === 'word_drill' && currentLesson && (
+          <WordDrillModule
+            category={currentCategory}
+            lesson={currentLesson}
+            onBack={() => setScreen('hub')}
+            onSaveScore={recordSessionScore}
+          />
+        )}
+
+        {screen === 'space_game' && currentLesson && (
+          <SpaceDefenseGameModule
+            category={currentCategory}
+            lesson={currentLesson}
+            onBack={() => setScreen('hub')}
+            onSaveScore={recordSessionScore}
+          />
+        )}
+
+        {screen === 'timed_exam' && currentLesson && (
+          <TimedExamModule
+            category={currentCategory}
+            lesson={currentLesson}
+            studentProfile={studentProfile}
+            setStudentProfile={setStudentProfile}
+            connectionMode={connectionMode}
+            onBack={() => setScreen('hub')}
+            onSaveScore={recordSessionScore}
+          />
+        )}
+      </main>
+
+      {/* 彈窗 1：同目錄外部題庫動態載入與擴充中心 */}
+      {showBankModal && (
+        <QuestionBankModal
+          manifest={manifest}
+          banks={banks}
+          loadStatus={loadStatus}
+          onClose={() => setShowBankModal(false)}
+          onHotMountFiles={handleHotMountFiles}
+          onAddCustomLesson={(catId, newLesson) => {
+            setBanks((prev) => {
+              const target = prev[catId];
+              if (!target) return prev;
+              return {
+                ...prev,
+                [catId]: {
+                  ...target,
+                  lessons: [...target.lessons, newLesson]
+                }
+              };
+            });
+          }}
+        />
+      )}
+
+      {/* 彈窗 2：方案 C 預留 — 教師連線設定與成績收集器面板 */}
+      {showTeacherPanel && (
+        <TeacherSyncModal
+          connectionMode={connectionMode}
+          setConnectionMode={setConnectionMode}
+          studentProfile={studentProfile}
+          setStudentProfile={setStudentProfile}
+          scoreHistory={scoreHistory}
+          banks={banks}
+          onDispatchLesson={(catId, lessonId) => {
+            setSelectedCatId(catId);
+            setSelectedLessonId(lessonId);
+            setShowTeacherPanel(false);
+          }}
+          onClose={() => setShowTeacherPanel(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 7. 啟動畫面 (還原影片 00:06「直接練習」與「和老師連線」雙入口 + 鍵盤視覺)
+// ============================================================================
+function SplashView({ connectionMode, setConnectionMode, studentProfile, setStudentProfile, onEnterHub }) {
+  const [showSyncConfig, setShowSyncConfig] = useState(false);
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center py-6">
+      <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+        {/* 背景電競網格光暈 */}
+        <div className="absolute -top-24 -left-24 w-72 h-72 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="text-center space-y-3 mb-8 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>現代扁平化電競重構版 • 支援同目錄動態題庫與方案 C 師生連線擴充</span>
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white">
+            校園打字專家 <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">【國小電競版】</span>
+          </h1>
+          <p className="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
+            結合色彩編碼十指人體工學、即時注音/英打雙引擎、星空防衛粒子特效與 LCS 智慧交叉比對評分系統
+          </p>
+        </div>
+
+        {/* 互動預覽鍵盤裝飾 (呼應原版啟動畫面中央大鍵盤與 A S D K L 字母角色) */}
+        <div className="mb-8 relative z-10">
+          <div className="flex justify-around items-center mb-3 px-6">
+            {['A', 'S', 'D', 'K', 'L'].map((ch, idx) => (
+              <div
+                key={ch}
+                className="flex flex-col items-center gap-1 animate-bounce"
+                style={{ animationDelay: `${idx * 150}ms`, animationDuration: '2.2s' }}
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border-2 border-cyan-400/60 flex items-center justify-center font-black text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.25)]">
+                  {ch}
+                </div>
+              </div>
+            ))}
+          </div>
+          <CyberVirtualKeyboard targetChar="f" lang="en" />
+        </div>
+
+        {/* 雙模式啟動按鈕 (直接練習 vs 和老師連線) */}
+        {!showSyncConfig ? (
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
+            <button
+              onClick={() => {
+                setConnectionMode('standalone');
+                onEnterHub();
+              }}
+              className="w-full sm:w-64 py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-lg shadow-[0_0_25px_rgba(34,211,238,0.4)] flex items-center justify-center gap-2.5 transition transform hover:-translate-y-0.5"
+            >
+              <Play className="w-5 h-5 fill-current" />
+              <span>直接練習 (單機自學)</span>
+            </button>
+
+            <button
+              onClick={() => setShowSyncConfig(true)}
+              className="w-full sm:w-64 py-4 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border-2 border-emerald-500/50 text-emerald-300 font-black text-lg flex items-center justify-center gap-2.5 transition transform hover:-translate-y-0.5"
+            >
+              <Wifi className="w-5 h-5" />
+              <span>和老師連線 (方案C)</span>
+            </button>
+          </div>
+        ) : (
+          <div className="bg-slate-950/90 border border-emerald-500/40 rounded-2xl p-5 max-w-xl mx-auto space-y-4 relative z-10">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-emerald-300 flex items-center gap-2">
+                <Wifi className="w-4 h-4" />
+                <span>和老師連線設定 (預留方案 C 教室區域網路/雲端同步介面)</span>
+              </h3>
+              <button
+                onClick={() => setShowSyncConfig(false)}
+                className="text-xs text-slate-400 hover:text-white"
+              >
+                返回
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">班級代碼</label>
+                <input
+                  type="text"
+                  value={studentProfile.classId}
+                  onChange={(e) => setStudentProfile({ ...studentProfile, classId: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">座號 (學號)</label>
+                <input
+                  type="text"
+                  value={studentProfile.seatNo}
+                  onChange={(e) => setStudentProfile({ ...studentProfile, seatNo: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">學生姓名</label>
+                <input
+                  type="text"
+                  value={studentProfile.name}
+                  onChange={(e) => setStudentProfile({ ...studentProfile, name: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">教師端成績收集伺服器 Endpoint (WebSocket / REST / GAS)</label>
+              <input
+                type="text"
+                value={studentProfile.serverUrl}
+                onChange={(e) => setStudentProfile({ ...studentProfile, serverUrl: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setConnectionMode('teacher_sync');
+                  onEnterHub();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>啟動連線並進入大廳</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 8. 戰術大廳 (還原影片 00:10 雙層下拉選單 + 四大島嶼入口)
+// ============================================================================
+function TacticalHubView({
+  manifest,
+  banks,
+  selectedCatId,
+  onSelectCategory,
+  selectedLessonId,
+  onSelectLesson,
+  currentCategory,
+  currentLesson,
+  onStartMode,
+  onOpenBankModal,
+  scoreHistory
+}) {
+  const modes = [
+    {
+      id: 'key_drill',
+      title: '鍵盤遊戲',
+      subtitle: 'STAGE 01 • 單鍵指法與肌肉記憶',
+      desc: '認識中英標準鍵位、十指色彩分工與雙手即時光點導引，內建防連打鎖定與大小寫 Shift 教學。',
+      icon: Keyboard,
+      accent: 'from-blue-500 to-cyan-400',
+      border: 'border-cyan-500/40 hover:border-cyan-400',
+      badge: '基礎指法必練'
+    },
+    {
+      id: 'word_drill',
+      title: '字例練習',
+      subtitle: 'STAGE 02 • 字根串聯與詞彙連打',
+      desc: '從單鍵過渡至連續字母、注音字根與核心英文字彙，打完按【空白鍵】送出，建立手指連貫節奏。',
+      icon: Type,
+      accent: 'from-purple-500 to-pink-500',
+      border: 'border-purple-500/40 hover:border-purple-400',
+      badge: '詞彙反射訓練'
+    },
+    {
+      id: 'space_game',
+      title: '打字遊戲',
+      subtitle: 'STAGE 03 • 星空防衛粒子射擊',
+      desc: '支援【按字母直擊】與【打完單字按空白鍵射擊】雙模式，五段動物/戰機速度調節與粒子爆炸特效！',
+      icon: Gamepad2,
+      accent: 'from-amber-500 to-orange-500',
+      border: 'border-amber-500/40 hover:border-amber-400',
+      badge: '盲打抗壓挑戰'
+    },
+    {
+      id: 'timed_exam',
+      title: '計時測驗',
+      subtitle: 'STAGE 04 • 逐行看打與智慧診斷',
+      desc: '奇偶行對照看打、支援中打 IME 組字防誤判，搭載 LCS 智慧交叉比對演算法（精準標註 * - + @@）。',
+      icon: Timer,
+      accent: 'from-rose-500 to-emerald-400',
+      border: 'border-rose-500/40 hover:border-rose-400',
+      badge: '正式檢定測驗'
+    }
+  ];
+
+  return (
+    <div className="space-y-6 py-2">
+      {/* 頂部雙層題庫選擇面板 (100% 對應原版左上角兩層下拉選單，並加入同目錄熱掛載提示) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+              <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                ACTIVE CURRICULUM SELECTOR • 同目錄動態題庫引擎
+              </span>
+            </div>
+            <h2 className="text-xl font-black text-white">請選擇訓練語系、題庫分類與子課程關卡</h2>
+          </div>
+
+          <button
+            onClick={onOpenBankModal}
+            className="self-start lg:self-center px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-2 transition"
+          >
+            <FolderOpen className="w-4 h-4" />
+            <span>掛載同目錄外部題庫 / 新增課程</span>
+          </button>
+        </div>
+
+        {/* 雙層下拉選單 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="text-xs font-bold text-slate-400 block mb-1.5">
+              1. 主題庫分類 (對應同目錄 `./bank_*.json`)
+            </label>
+            <select
+              value={selectedCatId}
+              onChange={(e) => onSelectCategory(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none transition"
+            >
+              {manifest.categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.title} ({cat.file})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-400 block mb-1.5">
+              2. 訓練單元 / 關卡選擇 (Q-1 ~ Q-6 / 字詞 / 精選文章)
+            </label>
+            <select
+              value={selectedLessonId}
+              onChange={(e) => onSelectLesson(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-3 text-sm font-bold text-cyan-300 outline-none transition"
+            >
+              {currentCategory?.lessons?.map((les) => (
+                <option key={les.id} value={les.id}>
+                  {les.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* 當前選中課程內容摘要預覽 */}
+        {currentLesson && (
+          <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono font-bold">
+                {currentLesson.code}
+              </span>
+              <span>{currentLesson.description}</span>
+            </div>
+            <div className="flex items-center gap-3 text-slate-400 font-mono">
+              <span>字元數: {currentLesson.keys?.length || 0}</span>
+              <span>•</span>
+              <span>字詞數: {currentLesson.words?.length || 0}</span>
+              <span>•</span>
+              <span>看打行數: {currentLesson.lines?.length || 0}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 四大核心訓練模式卡片 (對應原版島嶼地圖四大區塊：鍵盤遊戲、字例練習、打字遊戲、計時測驗) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {modes.map((m) => {
+          const Icon = m.icon;
+          return (
+            <div
+              key={m.id}
+              onClick={() => onStartMode(m.id)}
+              className={`group cursor-pointer bg-slate-900/85 hover:bg-slate-900 border-2 ${m.border} rounded-2xl p-5 sm:p-6 transition-all duration-200 shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-mono font-bold tracking-wider text-slate-400 uppercase block">
+                    {m.subtitle}
+                  </span>
+                  <h3 className="text-2xl font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>{m.title}</span>
+                    <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition" />
+                  </h3>
+                </div>
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${m.accent} flex items-center justify-center text-slate-950 shadow-lg group-hover:scale-110 transition`}>
+                  <Icon className="w-7 h-7" />
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300/90 my-4 leading-relaxed">
+                {m.desc}
+              </p>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
+                <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-800 text-slate-300">
+                  {m.badge}
+                </span>
+                <span className="text-xs font-extrabold text-cyan-400 group-hover:underline">
+                  進入訓練艙 →
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 底部近期戰績排行榜 */}
+      <div className="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <Trophy className="w-4 h-4 text-amber-400" />
+            <span>本機與教師連線最近訓練戰績紀錄</span>
+          </h4>
+          <span className="text-[11px] text-slate-500">完成任一模式自動寫入紀錄並同步至教師端</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400">
+                <th className="py-2 px-2">時間</th>
+                <th className="py-2 px-2">學生身分</th>
+                <th className="py-2 px-2">訓練模式</th>
+                <th className="py-2 px-2">課程代碼</th>
+                <th className="py-2 px-2 text-right">速度指標</th>
+                <th className="py-2 px-2 text-right">錯誤率</th>
+                <th className="py-2 px-2 text-right">綜合得分</th>
+                <th className="py-2 px-2 text-center">狀態</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {scoreHistory.slice(0, 5).map((item) => (
+                <tr key={item.id} className="hover:bg-slate-800/40">
+                  <td className="py-2 px-2 font-mono text-slate-400">{item.timestamp}</td>
+                  <td className="py-2 px-2 font-semibold text-slate-200">{item.student}</td>
+                  <td className="py-2 px-2 text-cyan-300 font-bold">{item.mode}</td>
+                  <td className="py-2 px-2 font-mono">{item.lesson}</td>
+                  <td className="py-2 px-2 text-right font-mono text-emerald-300">{item.speed}</td>
+                  <td className="py-2 px-2 text-right font-mono text-rose-300">{item.errorRate}</td>
+                  <td className="py-2 px-2 text-right font-mono font-bold text-amber-300">{item.score}</td>
+                  <td className="py-2 px-2 text-center">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.synced ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                      {item.synced ? '已上傳教師端' : '本機紀錄'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 9. 模組一：鍵盤遊戲 (單鍵指法訓練 — 還原影片 00:21 ~ 01:42)
+//    - 支援「練習」與「挑戰」切換、5/10/15/20 分鐘設定
+//    - 支援 Q-6 彈出 Shift / CapsLock 大小寫與符號說明視窗 (影片 01:09)
+//    - 支援連打防呆提示：「打字中…不能改！」、「已經開始囉」(影片 00:48)
+//    - 結算彈窗顯示：答對題數、答錯題數、每分鐘鍵數 (KPM)、錯誤率 (%)、計時
+// ============================================================================
+function KeyboardDrillModule({ category, lesson, onBack, onSaveScore }) {
+  const [subMode, setSubMode] = useState('practice'); // 'practice' (練習) | 'challenge' (挑戰)
+  const [durationMin, setDurationMin] = useState(5);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'finished'
+  const [timeLeft, setTimeLeft] = useState(5 * 60);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  // 題目狀態
+  const keyPool = useMemo(() => {
+    const raw = lesson.keys && lesson.keys.length > 0 ? lesson.keys : 'asdfjkl; '.split('');
+    return raw;
+  }, [lesson]);
+
+  const [qIndex, setQIndex] = useState(0);
+  const [targetChar, setTargetChar] = useState(keyPool[0] || 'a');
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [feedbackStatus, setFeedbackStatus] = useState(null); // 'correct' | 'wrong'
+  const [lastWrongKey, setLastWrongKey] = useState(null);
+  const [bannerNotice, setBannerNotice] = useState('按【空白鍵】或【Enter】鍵開始');
+  const [showShiftGuide, setShowShiftGuide] = useState(() => Boolean(lesson.requiresShiftHint));
+
+  // 計時器
+  useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => {
+      setElapsedSec((s) => s + 1);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setStatus('finished');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
+  // 啟動或重置練習
+  const startDrill = useCallback(() => {
+    soundEngine.playClick();
+    setStatus('running');
+    setTimeLeft(durationMin * 60);
+    setElapsedSec(0);
+    setCorrectCount(0);
+    setWrongCount(0);
+    setQIndex(0);
+    setTargetChar(keyPool[0] || 'a');
+    setFeedbackStatus(null);
+    setBannerNotice('開始挑戰囉！');
+  }, [durationMin, keyPool]);
+
+  const finishDrill = useCallback(() => {
+    if (status !== 'running') return;
+    setStatus('finished');
+    const usedSec = Math.max(1, elapsedSec);
+    const kpm = Math.round((correctCount / usedSec) * 60);
+    const total = correctCount + wrongCount;
+    const errRate = total > 0 ? Math.round((wrongCount / total) * 100) : 0;
+    onSaveScore({
+      mode: '鍵盤遊戲',
+      lesson: `${lesson.code}${subMode === 'practice' ? 's' : 'r'}`,
+      speed: `${kpm} 鍵/分`,
+      errorRate: `${errRate}%`,
+      score: Math.max(0, correctCount * 10 - wrongCount * 15)
+    });
+  }, [status, elapsedSec, correctCount, wrongCount, lesson.code, subMode, onSaveScore]);
+
+  // 攔截鍵盤事件 (支援英打、大小寫與中打注音實體鍵位直擊)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (showShiftGuide) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setShowShiftGuide(false);
+        }
+        return;
+      }
+
+      // 忽略純修飾鍵本身
+      if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) {
+        return;
+      }
+
+      if (status === 'idle') {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          startDrill();
+        }
+        return;
+      }
+
+      if (status !== 'running') return;
+      e.preventDefault();
+
+      // 判斷學生按下的字元 (若是中打注音模式，可由實體按鍵 e.code 直接映射注音符號，免切換輸入法！)
+      let pressedChar = e.key;
+      if (category.lang === 'zh-bopomofo') {
+        if (e.code === 'Space') {
+          pressedChar = ' ';
+        } else if (CODE_TO_ZH_MAP[e.code]) {
+          pressedChar = CODE_TO_ZH_MAP[e.code];
+        }
+      }
+
+      if (pressedChar === targetChar) {
+        soundEngine.playHit(1);
+        const nextCorrect = correctCount + 1;
+        setCorrectCount(nextCorrect);
+        setFeedbackStatus('correct');
+        setLastWrongKey(null);
+        setBannerNotice(`答對 ${nextCorrect} 題${wrongCount > 0 ? `  錯 ${wrongCount} 題` : ''}`);
+
+        // 推進下一題
+        const nextIdx = (qIndex + 1) % keyPool.length;
+        setQIndex(nextIdx);
+        setTargetChar(keyPool[nextIdx]);
+      } else {
+        soundEngine.playError();
+        const nextWrong = wrongCount + 1;
+        setWrongCount(nextWrong);
+        setFeedbackStatus('wrong');
+        setLastWrongKey(pressedChar);
+        setBannerNotice(`答對 ${correctCount} 題  錯 ${nextWrong} 題`);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [status, showShiftGuide, category.lang, targetChar, correctCount, wrongCount, qIndex, keyPool, startDrill]);
+
+  // 點擊上方設定按鈕時的防呆提示 (還原影片 00:48「打字中…不能改！」)
+  const handleLockedSettingClick = (actionFn) => {
+    if (status === 'running') {
+      soundEngine.playError();
+      setBannerNotice('打字中…不能改！');
+      return;
+    }
+    actionFn();
+  };
+
+  const usedSec = Math.max(1, elapsedSec);
+  const kpm = Math.round((correctCount / usedSec) * 60);
+  const totalAttempts = correctCount + wrongCount;
+  const errorRate = totalAttempts > 0 ? Math.round((wrongCount / totalAttempts) * 100) : 0;
+
+  return (
+    <div className="space-y-4">
+      {/* 頂部功能控制列 (完全對應影片 00:21 頂部按鈕列：字根、練習、挑戰、時間、進度、結束、離開) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleLockedSettingClick(() => setSubMode('practice'))}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 ${
+              subMode === 'practice'
+                ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.4)]'
+                : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}
+          >
+            <span>1. 練習 (標準指法提示)</span>
+          </button>
+
+          <button
+            onClick={() => handleLockedSettingClick(() => setSubMode('challenge'))}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 ${
+              subMode === 'challenge'
+                ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]'
+                : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}
+          >
+            <span>2. 挑戰 (隨機抽考模式)</span>
+          </button>
+
+          <button
+            onClick={() =>
+              handleLockedSettingClick(() => {
+                const nextMin = durationMin === 5 ? 10 : durationMin === 10 ? 15 : durationMin === 15 ? 20 : 5;
+                setDurationMin(nextMin);
+                setTimeLeft(nextMin * 60);
+              })
+            }
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition"
+          >
+            3. 時間 ({durationMin} 分鐘)
+          </button>
+
+          {lesson.requiresShiftHint && (
+            <button
+              onClick={() => setShowShiftGuide(true)}
+              className="px-3 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold"
+            >
+              Shift 大小寫說明
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* 倒數計時器 */}
+          <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-amber-500/40 font-mono text-base font-black text-amber-300 flex items-center gap-2">
+            <Timer className="w-4 h-4 text-amber-400" />
+            <span>
+              {String(Math.floor(timeLeft / 60)).padStart(2, '0')} : {String(timeLeft % 60).padStart(2, '0')}
+            </span>
+          </div>
+
+          {status === 'running' ? (
+            <button
+              onClick={finishDrill}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition"
+            >
+              結束結算 (E)
+            </button>
+          ) : (
+            <button
+              onClick={startDrill}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition"
+            >
+              開始挑戰 (Space)
+            </button>
+          )}
+
+          <button
+            onClick={onBack}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-xs transition"
+          >
+            離開 (X)
+          </button>
+        </div>
+      </div>
+
+      {/* 中央目標字卡顯示區 + 狀態橫幅 + 雙手十指指示圖 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        {/* 左側目標字根星空黑板 */}
+        <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+              {lesson.title}
+            </span>
+            <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-extrabold text-sm">
+              {bannerNotice}
+            </span>
+          </div>
+
+          <div className="my-4 flex items-center justify-center gap-6">
+            {/* 大型藍色星空目標字卡 (還原影片中央藍底黃字顯示框) */}
+            <div className="w-56 h-32 rounded-2xl bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-950 border-2 border-cyan-400/60 shadow-[0_0_30px_rgba(34,211,238,0.2)] flex flex-col items-center justify-center relative">
+              {status === 'idle' ? (
+                <div className="text-center">
+                  <div className="text-2xl font-black text-amber-300 tracking-wide">⊙_⊙y</div>
+                  <div className="text-xs text-cyan-300 mt-1 font-bold">按【空白鍵】開始</div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-5xl sm:text-6xl font-mono font-black text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)]">
+                    {targetChar === ' ' ? '空白' : targetChar}
+                  </span>
+                  {category.lang === 'zh-bopomofo' && CHAR_TO_KEY_MAP[targetChar] && (
+                    <span className="text-[11px] font-mono text-cyan-300 mt-1">
+                      對應英數鍵: [{CHAR_TO_KEY_MAP[targetChar].main}]
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* 即時統計資訊卡 */}
+            <div className="grid grid-cols-2 gap-2.5 flex-1 max-w-xs">
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
+                <div className="text-[11px] text-slate-400">答對題數</div>
+                <div className="text-xl font-black font-mono text-emerald-400">{correctCount} 題</div>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
+                <div className="text-[11px] text-slate-400">答錯題數</div>
+                <div className="text-xl font-black font-mono text-rose-400">{wrongCount} 題</div>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
+                <div className="text-[11px] text-slate-400">每分鐘鍵數</div>
+                <div className="text-lg font-black font-mono text-cyan-300">{status === 'running' ? kpm : 0} 鍵/分</div>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3">
+                <div className="text-[11px] text-slate-400">目前錯誤率</div>
+                <div className="text-lg font-black font-mono text-amber-300">{errorRate}%</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-400 flex items-center justify-between border-t border-slate-800/80 pt-2.5">
+            <span>提示：請將左手食指輕放於 F 鍵、右手食指輕放於 J 鍵定位凸點上</span>
+            <span className="font-mono text-cyan-300">進度：{qIndex + 1} / {keyPool.length}</span>
+          </div>
+        </div>
+
+        {/* 右側雙手十指動態光點指示器 */}
+        <div className="lg:col-span-4">
+          <CyberHandsIndicator
+            targetChar={status === 'running' ? targetChar : null}
+            feedbackStatus={feedbackStatus}
+          />
+        </div>
+      </div>
+
+      {/* 下方彩色人體工學虛擬鍵盤 */}
+      <CyberVirtualKeyboard
+        targetChar={status === 'running' ? targetChar : null}
+        lang={category.lang}
+        lastWrongKey={lastWrongKey}
+      />
+
+      {/* Q-6 專屬：大小寫與符號輸入方式提示視窗 (100% 還原影片 01:09 彈窗) */}
+      {showShiftGuide && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border-2 border-cyan-400 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2.5 text-cyan-300 font-black text-lg">
+              <Info className="w-6 h-6" />
+              <span>【大、小寫及符號】輸入法說明</span>
+            </div>
+            <div className="space-y-3 text-sm text-slate-200 leading-relaxed bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <p>本課含【大、小寫及符號】兩種切換方式：</p>
+              <p className="text-amber-300 font-semibold">
+                1. 出現全大寫或大小寫切換時，可按左方【CapsLock】鍵切換，或搭配左右【Shift】複合鍵。
+              </p>
+              <p className="text-cyan-300 font-semibold">
+                2. 大寫字母「A B C...」或上排符號「! @ # $ %...」，請用另一手小指按住【Shift】複合鍵不放，再按目標鍵！
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowShiftGuide(false)}
+                className="px-6 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-sm"
+              >
+                確定 (Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 結算成績單彈窗 (還原影片 00:59 與 01:41 結算畫面) */}
+      {status === 'finished' && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border-2 border-emerald-400 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-300 flex items-center justify-center mx-auto">
+              <Award className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white">鍵盤練習結算報告</h3>
+              <p className="text-xs text-slate-400 mt-1">{lesson.title}</p>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 text-left font-mono text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">課程代號：</span>
+                <span className="text-cyan-300 font-bold">{lesson.code}{subMode === 'practice' ? 's' : 'r'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">答對題數：</span>
+                <span className="text-emerald-400 font-bold">{correctCount} 題</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">答錯題數：</span>
+                <span className="text-rose-400 font-bold">{wrongCount} 題</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">打字速度：</span>
+                <span className="text-amber-300 font-bold">每分鐘 {kpm} 鍵</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">錯誤率：</span>
+                <span className="text-rose-300 font-bold">{errorRate}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">總計時：</span>
+                <span className="text-slate-200 font-bold">
+                  {Math.floor(elapsedSec / 60)} 分 {elapsedSec % 60} 秒
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={startDrill}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm"
+              >
+                再玩一次
+              </button>
+              <button
+                onClick={() => setStatus('idle')}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm"
+              >
+                返回練習畫面
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 10. 模組二：字例練習 (字串與詞彙連貫訓練 — 還原影片 01:51 ~ 02:12)
+//     - 顯示目標字串（如 abcd, efg, hij, klmn 或單字）
+//     - 每輸入一個正確字元，下方虛擬鍵盤自動預判並高亮「下一個字元」對應的按鍵與手指
+//     - 打完字串後按空白鍵或自動完成該題
+// ============================================================================
+function WordDrillModule({ category, lesson, onBack, onSaveScore }) {
+  const [durationMin, setDurationMin] = useState(15);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'finished'
+  const [timeLeft, setTimeLeft] = useState(15 * 60);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  const wordPool = useMemo(() => {
+    return lesson.words && lesson.words.length > 0
+      ? lesson.words
+      : ['abcd', 'efg', 'hij', 'klmn', 'opq', 'rstuv', 'wxyz'];
+  }, [lesson]);
+
+  const [wordIdx, setWordIdx] = useState(0);
+  const [typedText, setTypedText] = useState('');
+  const [correctWords, setCorrectWords] = useState(0);
+  const [wrongWords, setWrongWords] = useState(0);
+  const [totalCharsTyped, setTotalCharsTyped] = useState(0);
+  const [feedbackStatus, setFeedbackStatus] = useState(null);
+  const inputRef = useRef(null);
+
+  const currentWord = wordPool[wordIdx] || 'abcd';
+  // 計算下一個應按的目標字元，供虛擬鍵盤與雙手圖即時高亮
+  const nextTargetChar = useMemo(() => {
+    if (status !== 'running') return null;
+    if (typedText.length < currentWord.length) {
+      return currentWord[typedText.length];
+    }
+    return ' '; // 打完單字提示按空白鍵或 Enter 送出
+  }, [status, typedText, currentWord]);
+
+  useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => {
+      setElapsedSec((s) => s + 1);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setStatus('finished');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
+  const startPractice = () => {
+    soundEngine.playClick();
+    setStatus('running');
+    setTimeLeft(durationMin * 60);
+    setElapsedSec(0);
+    setWordIdx(0);
+    setTypedText('');
+    setCorrectWords(0);
+    setWrongWords(0);
+    setTotalCharsTyped(0);
+    setFeedbackStatus(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const finishPractice = () => {
+    if (status !== 'running') return;
+    setStatus('finished');
+    const usedSec = Math.max(1, elapsedSec);
+    const wpm = Math.round((totalCharsTyped / usedSec) * 60);
+    const total = correctWords + wrongWords;
+    const errRate = total > 0 ? Math.round((wrongWords / total) * 100) : 0;
+    onSaveScore({
+      mode: '字例練習',
+      lesson: `${lesson.code}w`,
+      speed: `${wpm} 字/分`,
+      errorRate: `${errRate}%`,
+      score: Math.max(0, correctWords * 20 - wrongWords * 10)
+    });
+  };
+
+  const submitCurrentWord = (val) => {
+    const cleanVal = val.trim();
+    if (!cleanVal) return;
+    if (cleanVal === currentWord) {
+      soundEngine.playHit(2);
+      setCorrectWords((c) => c + 1);
+      setTotalCharsTyped((c) => c + currentWord.length);
+      setFeedbackStatus('correct');
+    } else {
+      soundEngine.playError();
+      setWrongWords((w) => w + 1);
+      setFeedbackStatus('wrong');
+    }
+    setTypedText('');
+    setWordIdx((idx) => (idx + 1) % wordPool.length);
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    soundEngine.playClick();
+    // 若使用者在尾端按下空白鍵，送出該字例
+    if (val.endsWith(' ')) {
+      submitCurrentWord(val);
+      return;
+    }
+    setTypedText(val);
+    // 若剛好完全符合目標字例，也可自動判定通過（完全還原影片 02:02 打完 abcd 直接跳下一題 efg 的流暢體驗）
+    if (val === currentWord) {
+      soundEngine.playHit(2);
+      setCorrectWords((c) => c + 1);
+      setTotalCharsTyped((c) => c + currentWord.length);
+      setFeedbackStatus('correct');
+      setTimeout(() => {
+        setTypedText('');
+        setWordIdx((idx) => (idx + 1) % wordPool.length);
+      }, 120);
+    }
+  };
+
+  const usedSec = Math.max(1, elapsedSec);
+  const cpm = Math.round((totalCharsTyped / usedSec) * 60);
+  const totalAttempts = correctWords + wrongWords;
+  const errorRate = totalAttempts > 0 ? Math.round((wrongWords / totalAttempts) * 100) : 0;
+
+  return (
+    <div className="space-y-4">
+      {/* 頂部控制列 */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-extrabold">
+            字例練習 • {lesson.title}
+          </span>
+          <button
+            onClick={() => {
+              if (status === 'running') return;
+              const nextMin = durationMin === 5 ? 10 : durationMin === 10 ? 15 : 5;
+              setDurationMin(nextMin);
+              setTimeLeft(nextMin * 60);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300"
+          >
+            時間設定：{durationMin} 分鐘
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-amber-500/40 font-mono text-base font-black text-amber-300">
+            {String(Math.floor(timeLeft / 60)).padStart(2, '0')} : {String(timeLeft % 60).padStart(2, '0')}
+          </div>
+
+          {status === 'running' ? (
+            <button
+              onClick={finishPractice}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
+            >
+              結束結算
+            </button>
+          ) : (
+            <button
+              onClick={startPractice}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs"
+            >
+              按此開始挑戰
+            </button>
+          )}
+
+          <button
+            onClick={onBack}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+          >
+            離開
+          </button>
+        </div>
+      </div>
+
+      {/* 中央字例黑板與輸入區 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400">
+              範例字詞連打（逐字對應下方發光鍵位）
+            </span>
+            <span className="text-sm font-extrabold text-amber-300">
+              {status === 'idle' ? '請點選【開始挑戰】啟動' : `答對 ${correctWords} 題  (錯 ${wrongWords} 題)`}
+            </span>
+          </div>
+
+          <div className="my-5 flex flex-col sm:flex-row items-center justify-center gap-4">
+            {/* 左側星空目標字串框 (還原影片 02:00 藍底黃字 abcd) */}
+            <div className="w-full sm:w-64 h-28 rounded-2xl bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-950 border-2 border-purple-400/60 flex items-center justify-center px-4 shadow-lg">
+              {status === 'idle' ? (
+                <span className="text-2xl font-black text-amber-300">字例練習</span>
+              ) : (
+                <div className="text-3xl sm:text-4xl font-mono font-black tracking-wider flex">
+                  {Array.from(currentWord).map((ch, idx) => {
+                    const typedChar = typedText[idx];
+                    const isMatched = typedChar === ch;
+                    const isWrong = typedChar !== undefined && typedChar !== ch;
+                    return (
+                      <span
+                        key={idx}
+                        className={
+                          isMatched
+                            ? 'text-emerald-400'
+                            : isWrong
+                            ? 'text-rose-400 underline'
+                            : 'text-amber-300'
+                        }
+                      >
+                        {ch}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 右側學生輸入白底/深色高對比框 */}
+            <div className="w-full sm:flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                disabled={status !== 'running'}
+                value={typedText}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitCurrentWord(typedText);
+                  }
+                }}
+                placeholder={status === 'running' ? `請輸入: ${currentWord}` : '等待開始...'}
+                className="w-full h-28 rounded-2xl bg-slate-950 border-2 border-cyan-400/70 px-5 text-3xl sm:text-4xl font-mono font-black text-rose-400 placeholder:text-slate-700 outline-none shadow-inner"
+              />
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-400 flex items-center justify-between border-t border-slate-800 pt-2.5">
+            <span>下一個目標按鍵：<strong className="text-cyan-300 font-mono">{nextTargetChar || '無'}</strong></span>
+            <span className="font-mono text-emerald-300">目前速度：{cpm} 字/分</span>
+          </div>
+        </div>
+
+        <div className="lg:col-span-4">
+          <CyberHandsIndicator targetChar={nextTargetChar} feedbackStatus={feedbackStatus} />
+        </div>
+      </div>
+
+      <CyberVirtualKeyboard targetChar={nextTargetChar} lang={category.lang} />
+
+      {/* 字例練習結算彈窗 (還原影片 02:11 Q-5w 結算視窗) */}
+      {status === 'finished' && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border-2 border-purple-400 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center">
+            <h3 className="text-xl font-black text-white">字例練習成績結算</h3>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 text-left font-mono text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">課程代號：</span>
+                <span className="text-purple-300 font-bold">{lesson.code}w</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">答對題數：</span>
+                <span className="text-emerald-400 font-bold">{correctWords} 題</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">答錯題數：</span>
+                <span className="text-rose-400 font-bold">{wrongWords} 題</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">每分鐘字數：</span>
+                <span className="text-amber-300 font-bold">每分鐘 {cpm} 字</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">錯誤率：</span>
+                <span className="text-rose-300 font-bold">{errorRate}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">計時：</span>
+                <span className="text-slate-200 font-bold">{Math.floor(elapsedSec / 60)} 分 {elapsedSec % 60} 秒</span>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={startPractice}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm"
+              >
+                再玩一次
+              </button>
+              <button
+                onClick={() => setStatus('idle')}
+                className="flex-1 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-black text-sm"
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 11. 模組三：打字遊戲 (星空防衛戰 — 還原影片 02:18 ~ 03:32)
+//     - 支援 2 種遊戲模式：
+//       (A) 【字根/單鍵模式】：畫面上方掉落單一字母/注音，直接按鍵立即雷射擊落（快慢擊落得 18~21 分，漏接倒扣 12 分）
+//       (B) 【單字模式】：畫面上方掉落完整單字（如 apple, angel, boy），在下方輸入框打完按【空白鍵】射擊（對得 20~60 分，打錯倒扣 20~40 分）
+//     - 支援 5 段速度切換（烏龜 1、小鳥 2、汽車 3、飛機 4、火箭 5）
+//     - HTML5 Canvas 星空背景、俄羅斯城堡天際線剪影與動態粒子爆炸特效
+// ============================================================================
+function SpaceDefenseGameModule({ category, lesson, onBack, onSaveScore }) {
+  const [gameType, setGameType] = useState('char'); // 'char' (單字元直擊) | 'word' (單字空白鍵射擊)
+  const [speedLevel, setSpeedLevel] = useState(3); // 1 ~ 5
+  const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'finished'
+  const [timeLeft, setTimeLeft] = useState(5 * 60);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  const [score, setScore] = useState(0);
+  const [hitCount, setHitCount] = useState(0);
+  const [missCount, setMissCount] = useState(0);
+  const [typedCharsTotal, setTypedCharsTotal] = useState(0);
+  const [statusLog, setStatusLog] = useState('★ 在挑戰模式，按 Enter 或點選【開始挑戰】啟動星空防衛！');
+  const [shooterInput, setShooterInput] = useState('');
+
+  const canvasRef = useRef(null);
+  const stateRef = useRef({
+    fallingItems: [],
+    particles: [],
+    lasers: [],
+    lastSpawn: 0,
+    score: 0,
+    hitCount: 0,
+    missCount: 0,
+    typedCharsTotal: 0
+  });
+
+  const speedConfigs = [
+    { lv: 1, name: 'Lv.1 烏龜慢速', icon: '🐢', vy: 0.45, spawnMs: 1700 },
+    { lv: 2, name: 'Lv.2 小鳥常速', icon: '🐦', vy: 0.75, spawnMs: 1400 },
+    { lv: 3, name: 'Lv.3 跑車中速', icon: '🚗', vy: 1.1, spawnMs: 1150 },
+    { lv: 4, name: 'Lv.4 噴射機高速', icon: '✈️', vy: 1.55, spawnMs: 900 },
+    { lv: 5, name: 'Lv.5 火箭極速', icon: '🚀', vy: 2.1, spawnMs: 700 }
+  ];
+
+  const currentSpeedCfg = speedConfigs.find((s) => s.lv === speedLevel) || speedConfigs[2];
+
+  // 建立爆炸粒子
+  const spawnExplosion = (x, y, color = '#38bdf8') => {
+    for (let i = 0; i < 18; i++) {
+      const angle = (Math.PI * 2 * i) / 18;
+      const spd = 1.5 + Math.random() * 3.5;
+      stateRef.current.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        alpha: 1,
+        color,
+        r: 2 + Math.random() * 2.5
+      });
+    }
+  };
+
+  // 啟動遊戲
+  const startGame = useCallback(() => {
+    soundEngine.playClick();
+    stateRef.current = {
+      fallingItems: [],
+      particles: [],
+      lasers: [],
+      lastSpawn: performance.now(),
+      score: 0,
+      hitCount: 0,
+      missCount: 0,
+      typedCharsTotal: 0
+    };
+    setScore(0);
+    setHitCount(0);
+    setMissCount(0);
+    setTypedCharsTotal(0);
+    setTimeLeft(5 * 60);
+    setElapsedSec(0);
+    setShooterInput('');
+    setStatusLog(gameType === 'char' ? '★ 看到掉落字元直接按鍵擊落！' : '★ 打完單字按【空白鍵】發射雷射擊落！');
+    setStatus('running');
+  }, [gameType]);
+
+  // 結束並結算遊戲 (還原影片 03:01 與 03:29 結算視窗)
+  const finishGame = useCallback(() => {
+    if (status !== 'running') return;
+    setStatus('finished');
+    const st = stateRef.current;
+    const usedSec = Math.max(1, elapsedSec);
+    const wpm = Math.round((st.typedCharsTotal / usedSec) * 60);
+    const total = st.hitCount + st.missCount;
+    const errRate = total > 0 ? Math.round((st.missCount / total) * 100) : 0;
+    onSaveScore({
+      mode: '打字遊戲',
+      lesson: `${lesson.code}g${speedLevel}`,
+      speed: `${wpm} 字/分`,
+      errorRate: `${errRate}%`,
+      score: st.score
+    });
+  }, [status, elapsedSec, lesson.code, speedLevel, onSaveScore]);
+
+  // 計時器
+  useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => {
+      setElapsedSec((s) => s + 1);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishGame();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status, finishGame]);
+
+  // Canvas 遊戲主迴圈
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    const charPool = (lesson.keys || 'abcdefghijklmnopqrstuvwxyz'.split('')).filter((k) => k !== ' ');
+    const wordPool = lesson.words && lesson.words.length > 0 ? lesson.words : ['apple', 'angel', 'boy', 'ball', 'car', 'cake', 'dog', 'duck', 'egg', 'easy'];
+    const colors = ['#facc15', '#38bdf8', '#f472b6', '#4ade80', '#c084fc', '#fb923c'];
+
+    const render = (now) => {
+      const width = canvas.width;
+      const height = canvas.height;
+      const groundY = height - 68;
+
+      // 1. 繪製深邃星空漸層背景
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, '#040d21');
+      grad.addColorStop(0.7, '#0c2448');
+      grad.addColorStop(1, '#132f5c');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // 繪製閃爍星點
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      for (let s = 0; s < 35; s++) {
+        const sx = (s * 97) % width;
+        const sy = (s * 53) % (groundY - 40);
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+
+      // 2. 若在運行中，定期生成掉落目標
+      if (status === 'running') {
+        if (now - stateRef.current.lastSpawn > currentSpeedCfg.spawnMs && stateRef.current.fallingItems.length < 6) {
+          const text = gameType === 'char'
+            ? charPool[Math.floor(Math.random() * charPool.length)]
+            : wordPool[Math.floor(Math.random() * wordPool.length)];
+          const padding = 80;
+          const x = padding + Math.random() * Math.max(100, width - padding * 2);
+          stateRef.current.fallingItems.push({
+            id: Math.random(),
+            text,
+            x,
+            y: 28,
+            vy: currentSpeedCfg.vy * (0.9 + Math.random() * 0.25),
+            color: colors[Math.floor(Math.random() * colors.length)]
+          });
+          stateRef.current.lastSpawn = now;
+        }
+
+        // 更新掉落物位置
+        const remaining = [];
+        for (const item of stateRef.current.fallingItems) {
+          item.y += item.vy;
+          if (item.y >= groundY) {
+            // 觸地漏接扣分 (還原影片 02:51「★來不及了！倒扣 12 分。」)
+            soundEngine.playError();
+            stateRef.current.score -= 12;
+            stateRef.current.missCount += 1;
+            setScore(stateRef.current.score);
+            setMissCount(stateRef.current.missCount);
+            setStatusLog('★ 來不及了！倒扣 12 分。');
+            spawnExplosion(item.x, groundY, '#f43f5e');
+          } else {
+            remaining.push(item);
+          }
+        }
+        stateRef.current.fallingItems = remaining;
+      }
+
+      // 3. 繪製掉落中的字元或單字
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const item of stateRef.current.fallingItems) {
+        ctx.font = gameType === 'char' ? '900 28px monospace' : '800 24px monospace';
+        ctx.shadowColor = item.color;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = item.color;
+        ctx.fillText(item.text, item.x, item.y);
+        ctx.shadowBlur = 0;
+      }
+
+      // 4. 繪製雷射光束
+      stateRef.current.lasers = stateRef.current.lasers.filter((l) => l.alpha > 0.05);
+      for (const l of stateRef.current.lasers) {
+        ctx.strokeStyle = `rgba(56, 189, 248, ${l.alpha})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(width / 2, groundY);
+        ctx.lineTo(l.tx, l.ty);
+        ctx.stroke();
+        l.alpha *= 0.82;
+      }
+
+      // 5. 繪製爆炸粒子
+      stateRef.current.particles = stateRef.current.particles.filter((p) => p.alpha > 0.04);
+      for (const p of stateRef.current.particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha *= 0.92;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // 6. 繪製底部克里姆林宮洋蔥圓頂奇幻天際線 (致敬原版經典視覺)
+      const domeCount = Math.floor(width / 70);
+      const domePalette = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7', '#ec4899'];
+      for (let i = 0; i < domeCount; i++) {
+        const bx = i * 70 + 10;
+        const towerH = 38 + (i % 3) * 12;
+        const by = height - towerH;
+        const col = domePalette[i % domePalette.length];
+
+        // 塔身
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(bx + 12, by + 16, 32, towerH - 16);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(bx + 24, by + 24, 8, 14);
+
+        // 洋蔥圓頂
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(bx + 28, by + 14, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 尖塔
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(bx + 28, by - 10);
+        ctx.lineTo(bx + 28, by);
+        ctx.stroke();
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
+  }, [status, gameType, currentSpeedCfg, lesson]);
+
+  // 單字元模式：攔截鍵盤直接射擊
+  useEffect(() => {
+    if (status !== 'running' || gameType !== 'char') return;
+    const handleKeyDown = (e) => {
+      if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+      if (e.key === 'Enter') return;
+
+      let pressed = e.key;
+      if (category.lang === 'zh-bopomofo' && CODE_TO_ZH_MAP[e.code]) {
+        pressed = CODE_TO_ZH_MAP[e.code];
+      }
+
+      // 尋找畫面中對應且最接近地面的目標
+      const items = stateRef.current.fallingItems;
+      let matchIdx = -1;
+      let maxY = -1;
+      items.forEach((it, idx) => {
+        if (it.text === pressed && it.y > maxY) {
+          maxY = it.y;
+          matchIdx = idx;
+        }
+      });
+
+      if (matchIdx !== -1) {
+        const hitItem = items[matchIdx];
+        // 根據高度決定得分 (18 ~ 21 分，還原影片 02:40「★快慢擊落，得 18 分 / 21 分」)
+        const gain = hitItem.y < 140 ? 21 : 18;
+        soundEngine.playLaser();
+        stateRef.current.lasers.push({ tx: hitItem.x, ty: hitItem.y, alpha: 1 });
+        spawnExplosion(hitItem.x, hitItem.y, hitItem.color);
+        items.splice(matchIdx, 1);
+
+        stateRef.current.score += gain;
+        stateRef.current.hitCount += 1;
+        stateRef.current.typedCharsTotal += 1;
+        setScore(stateRef.current.score);
+        setHitCount(stateRef.current.hitCount);
+        setTypedCharsTotal(stateRef.current.typedCharsTotal);
+        setStatusLog(`★ 快慢擊落，得 ${gain} 分。`);
+      } else {
+        soundEngine.playError();
+        stateRef.current.score -= 10;
+        stateRef.current.missCount += 1;
+        setScore(stateRef.current.score);
+        setMissCount(stateRef.current.missCount);
+        setStatusLog('★ 打錯了！倒扣 10 分。');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [status, gameType, category.lang]);
+
+  // 單字模式：輸入框按空白鍵或 Enter 射擊 (還原影片 03:09 ~ 03:28)
+  const handleWordShoot = (rawVal) => {
+    const word = rawVal.trim();
+    if (!word) return;
+    const items = stateRef.current.fallingItems;
+    const matchIdx = items.findIndex((it) => it.text === word);
+
+    if (matchIdx !== -1) {
+      const hitItem = items[matchIdx];
+      const gain = Math.max(20, word.length * 10);
+      soundEngine.playLaser();
+      stateRef.current.lasers.push({ tx: hitItem.x, ty: hitItem.y, alpha: 1 });
+      spawnExplosion(hitItem.x, hitItem.y, hitItem.color);
+      items.splice(matchIdx, 1);
+
+      stateRef.current.score += gain;
+      stateRef.current.hitCount += 1;
+      stateRef.current.typedCharsTotal += word.length;
+      setScore(stateRef.current.score);
+      setHitCount(stateRef.current.hitCount);
+      setTypedCharsTotal(stateRef.current.typedCharsTotal);
+      setStatusLog(`★ 快慢擊落，得 ${gain} 分。`);
+    } else {
+      soundEngine.playError();
+      const penalty = 20;
+      stateRef.current.score -= penalty;
+      stateRef.current.missCount += 1;
+      setScore(stateRef.current.score);
+      setMissCount(stateRef.current.missCount);
+      setStatusLog(`★ 打錯了！倒扣 ${penalty} 分。`);
+    }
+    setShooterInput('');
+  };
+
+  const usedSec = Math.max(1, elapsedSec);
+  const wpm = Math.round((typedCharsTotal / usedSec) * 60);
+
+  return (
+    <div className="space-y-3">
+      {/* 頂部選單與動物速度切換列 (還原影片 02:18 單字/字根切換、烏龜/小鳥/汽車/飛機圖示、目前得分看板) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              if (status === 'running') return;
+              setGameType('char');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+              gameType === 'char'
+                ? 'bg-cyan-400 text-slate-950 border-cyan-300'
+                : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}
+          >
+            字根直擊模式 (A)
+          </button>
+          <button
+            onClick={() => {
+              if (status === 'running') return;
+              setGameType('word');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+              gameType === 'word'
+                ? 'bg-amber-400 text-slate-950 border-amber-300'
+                : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}
+          >
+            單字射擊模式 (W)
+          </button>
+
+          {/* 5 級速度選擇 */}
+          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 gap-1">
+            {speedConfigs.map((cfg) => (
+              <button
+                key={cfg.lv}
+                onClick={() => setSpeedLevel(cfg.lv)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                  speedLevel === cfg.lv
+                    ? 'bg-cyan-500/30 text-cyan-200 border border-cyan-400/50'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title={cfg.name}
+              >
+                <span>{cfg.icon}</span>
+                <span className="hidden md:inline">Lv.{cfg.lv}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 中央即時總分顯示 */}
+        <div className="px-4 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/50 text-amber-300 font-black text-base tracking-wide">
+          目前得 {score} 分
+        </div>
+
+        <div className="flex items-center gap-2">
+          {status === 'running' ? (
+            <button
+              onClick={finishGame}
+              className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
+            >
+              結束結算
+            </button>
+          ) : (
+            <button
+              onClick={startGame}
+              className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs"
+            >
+              開始挑戰
+            </button>
+          )}
+          <button
+            onClick={onBack}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+          >
+            離開 (X)
+          </button>
+        </div>
+      </div>
+
+      {/* 星空防衛戰 Canvas 主舞台 */}
+      <div className="relative rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-slate-950">
+        <canvas
+          ref={canvasRef}
+          width={960}
+          height={430}
+          className="w-full h-[360px] sm:h-[430px] block"
+        />
+
+        {status === 'idle' && (
+          <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
+            <div className="px-6 py-4 rounded-2xl bg-slate-900/95 border-2 border-amber-400 shadow-2xl max-w-md space-y-3">
+              <div className="text-amber-300 font-black text-2xl">
+                {gameType === 'char' ? '★ 單鍵雷射防衛戰' : '★ 單字空白鍵射擊戰'}
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {gameType === 'char'
+                  ? '看到夜空中掉落的字母或注音字根，直接按下鍵盤對應按鍵即可發射雷射擊落！'
+                  : '看到夜空中掉落的英文單字，於下方射擊艙輸入完整單字並按【空白鍵】即可擊落！'}
+              </p>
+              <button
+                onClick={startGame}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-base shadow-lg"
+              >
+                按此開始挑戰 (Enter)
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 底部射擊控制台與狀態訊息列 (還原影片底部：左方黑底黃字得分訊息 + 中央射擊輸入框 + 右方計時器) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-amber-300 font-bold text-sm min-w-[240px]">
+          {statusLog}
+        </div>
+
+        {gameType === 'word' && (
+          <div className="flex-1 max-w-sm">
+            <input
+              type="text"
+              disabled={status !== 'running'}
+              value={shooterInput}
+              onChange={(e) => {
+                const v = e.target.value;
+                soundEngine.playClick();
+                if (v.endsWith(' ')) {
+                  handleWordShoot(v);
+                } else {
+                  setShooterInput(v);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleWordShoot(shooterInput);
+                }
+              }}
+              placeholder="輸入掉落單字後按【空白鍵】射擊..."
+              className="w-full bg-slate-950 border-2 border-cyan-400 rounded-xl px-4 py-2 text-lg font-mono font-bold text-white outline-none"
+            />
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 font-mono text-sm">
+          <span className="text-emerald-400 font-bold">擊中: {hitCount}</span>
+          <span className="text-rose-400 font-bold">失誤: {missCount}</span>
+          <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-300 font-black">
+            計時 {String(Math.floor(timeLeft / 60)).padStart(2, '0')} : {String(timeLeft % 60).padStart(2, '0')}
+          </div>
+        </div>
+      </div>
+
+      {/* 打字遊戲結算彈窗 (100% 還原影片 03:01 與 03:29：打對、打錯、每分鐘字數、綜合成績、英打扣分嚴苛請穩紮穩打) */}
+      {status === 'finished' && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border-2 border-amber-400 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center">
+            <h3 className="text-xl font-black text-white">打字遊戲戰績結算</h3>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 text-left font-mono text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">關卡代號：</span>
+                <span className="text-cyan-300 font-bold">{lesson.code}g{speedLevel}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">打對：</span>
+                <span className="text-emerald-400 font-bold">
+                  {gameType === 'char' ? `${hitCount} 題` : `${typedCharsTotal} ch`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">打錯：</span>
+                <span className="text-rose-400 font-bold">{missCount} 題</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">每分鐘：</span>
+                <span className="text-amber-300 font-bold">{wpm} 字</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">計時：</span>
+                <span className="text-slate-200 font-bold">{Math.floor(elapsedSec / 60)} 分 {elapsedSec % 60} 秒</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-slate-800">
+                <span className="text-slate-300 font-bold">綜合成績：</span>
+                <span className="text-amber-400 font-black text-base">得 {score} 分</span>
+              </div>
+            </div>
+            <p className="text-xs font-bold text-cyan-300">
+              （英打扣分嚴苛，請穩紮穩打）
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={startGame}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm"
+              >
+                再玩一次
+              </button>
+              <button
+                onClick={() => setStatus('idle')}
+                className="flex-1 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm"
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 12. 模組四：計時測驗 / 逐行看打 (還原影片 03:35 ~ 05:14)
+//     - 頂部學生資訊列：題庫、時間 (1~10分)、學號、姓名、班級
+//     - 測驗前確認彈窗 (影片 03:49)：提醒打完一行按 Enter 跳下一行、多打/漏打/打錯採智慧評分
+//     - 奇偶行對照看打區：支援中打 IME 組字事件 (compositionstart/end)，右上角動態狀態 (`打快點..` / `Orz..` / `加油喔..`)
+//     - 成績檢視報告 (影片 04:55 ~ 05:13)：
+//       完整呈現 `*` (打錯)、`-` (漏打)、`+` (多打)、`←` (最後位置)、`@@` (顛倒打字)
+//       每行統計：`*打對: X  打錯: X  漏打: X  多打: X  得分: X  L:行號`
+// ============================================================================
+function TimedExamModule({
+  category,
+  lesson,
+  studentProfile,
+  setStudentProfile,
+  connectionMode,
+  onBack,
+  onSaveScore
+}) {
+  const [durationMin, setDurationMin] = useState(3);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'confirm_modal' | 'running' | 'report'
+  const [timeLeft, setTimeLeft] = useState(3 * 60);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  const targetLines = useMemo(() => {
+    return lesson.lines && lesson.lines.length > 0
+      ? lesson.lines
+      : [
+          'zxcvb za xs cd vf bf nm,./ nj mj ,k .l /; zxcvb nm,./',
+          'zoo zero lazy ox fox fix six taxi cd card city clock',
+          'very five give love bee bird baby ball nice next neck',
+          'man milk moon music a.m. p.m. mr. color candy school',
+          'brother mother uncle duck rabbit zebra cowboy family'
+        ];
+  }, [lesson]);
+
+  const [typedLines, setTypedLines] = useState(() => targetLines.map(() => ''));
+  const [activeLineIdx, setActiveLineIdx] = useState(0);
+  const [cursorCol, setCursorCol] = useState(1);
+  const [isComposing, setIsComposing] = useState(false);
+  const [selectedReportLineIdx, setSelectedReportLineIdx] = useState(null);
+
+  const lineInputRefs = useRef([]);
+
+  // 當課程切換時重置行資料
+  useEffect(() => {
+    setTypedLines(targetLines.map(() => ''));
+    setActiveLineIdx(0);
+    setCursorCol(1);
+  }, [targetLines]);
+
+  // 倒數計時器
+  useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => {
+      setElapsedSec((s) => s + 1);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setStatus('report');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
+  // 正式啟動逐行看打
+  const launchExam = () => {
+    soundEngine.playClick();
+    setTypedLines(targetLines.map(() => ''));
+    setActiveLineIdx(0);
+    setCursorCol(1);
+    setTimeLeft(durationMin * 60);
+    setElapsedSec(0);
+    setSelectedReportLineIdx(null);
+    setStatus('running');
+    setTimeout(() => {
+      lineInputRefs.current[0]?.focus();
+    }, 60);
+  };
+
+  // 計算全部行的 LCS 智慧交叉比對報告
+  const examReport = useMemo(() => {
+    if (status !== 'report') return null;
+    // 找出最後一行有輸入內容的行索引
+    let lastTypedIdx = 0;
+    typedLines.forEach((txt, idx) => {
+      if (txt.length > 0) lastTypedIdx = idx;
+    });
+
+    const lineResults = targetLines.map((tLine, idx) => {
+      const uLine = typedLines[idx] || '';
+      const isLast = idx === lastTypedIdx;
+      return {
+        lineNo: idx + 1,
+        ...analyzeSmartLineDiff(tLine, uLine, isLast && idx <= lastTypedIdx)
+      };
+    });
+
+    let totalCorrect = 0;
+    let totalWrong = 0;
+    let totalMissing = 0;
+    let totalExtra = 0;
+    let totalScore = 0;
+
+    lineResults.forEach((r) => {
+      if (r.typedText.length > 0) {
+        totalCorrect += r.correct;
+        totalWrong += r.wrong;
+        totalMissing += r.missing;
+        totalExtra += r.extra;
+        totalScore += r.score;
+      }
+    });
+
+    const usedSec = Math.max(1, elapsedSec);
+    // 原版評分規則：英打以每4個英文字母折算1個字，或直接顯示字元/分鐘與錯誤率
+    const cpm = Math.round((totalCorrect / usedSec) * 60);
+    const totalMistakes = totalWrong + totalMissing + totalExtra;
+    const totalEvaluated = Math.max(1, totalCorrect + totalMistakes);
+    const errorRate = Math.round((totalMistakes / totalEvaluated) * 100);
+
+    return {
+      lineResults,
+      totalCorrect,
+      totalWrong,
+      totalMissing,
+      totalExtra,
+      totalMistakes,
+      totalScore,
+      cpm,
+      errorRate,
+      usedSec
+    };
+  }, [status, targetLines, typedLines, elapsedSec]);
+
+  // 完成看打並進入成績報告
+  const finishExam = useCallback(() => {
+    if (status !== 'running') return;
+    setStatus('report');
+  }, [status]);
+
+  // 當報告產生時寫入歷史成績
+  useEffect(() => {
+    if (status === 'report' && examReport) {
+      onSaveScore({
+        mode: '計時測驗',
+        lesson: lesson.code,
+        speed: `${examReport.cpm} 字/分`,
+        errorRate: `${examReport.errorRate}%`,
+        score: examReport.totalScore
+      });
+    }
+  }, [status, examReport, lesson.code, onSaveScore]);
+
+  // 支援 Alt+F12 或 Ctrl+Enter 提前結束看打 (還原影片左下角 `Alt+F12提前結束`)
+  useEffect(() => {
+    if (status !== 'running') return;
+    const handleGlobalKey = (e) => {
+      if ((e.altKey && e.key === 'F12') || (e.ctrlKey && e.key === 'Enter')) {
+        e.preventDefault();
+        finishExam();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, [status, finishExam]);
+
+  // 右上角動態表情狀態 (還原影片 04:21 `打快點..` -> `Orz..` -> `加油喔..`)
+  const moodBanner = useMemo(() => {
+    if (status !== 'running') return '計時測驗(T)';
+    if (elapsedSec < 12) return '測驗中..';
+    if (elapsedSec % 18 < 6) return '打快點..';
+    if (elapsedSec % 18 < 12) return 'Orz..';
+    return '加油喔..';
+  }, [status, elapsedSec]);
+
+  return (
+    <div className="space-y-4">
+      {/* 頂部學生資訊與控制列 (還原影片 03:35 題庫、時間、學號、姓名、班級、逐行看打按鈕) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-bold">題庫:</span>
+            <span className="px-2.5 py-1 rounded-lg bg-blue-500/20 border border-blue-400/40 text-blue-300 text-xs font-extrabold">
+              {lesson.title}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-bold">時間:</span>
+            <select
+              disabled={status === 'running'}
+              value={durationMin}
+              onChange={(e) => {
+                const m = Number(e.target.value);
+                setDurationMin(m);
+                setTimeLeft(m * 60);
+              }}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold text-amber-300"
+            >
+              {[1, 2, 3, 5, 10].map((m) => (
+                <option key={m} value={m}>{m} 分</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400">學號:</span>
+            <input
+              type="text"
+              disabled={status === 'running'}
+              value={studentProfile.seatNo}
+              onChange={(e) => setStudentProfile({ ...studentProfile, seatNo: e.target.value })}
+              className="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono text-white"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400">姓名:</span>
+            <input
+              type="text"
+              disabled={status === 'running'}
+              value={studentProfile.name}
+              onChange={(e) => setStudentProfile({ ...studentProfile, name: e.target.value })}
+              className="w-24 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400">班級:</span>
+            <input
+              type="text"
+              disabled={status === 'running'}
+              value={studentProfile.classId}
+              onChange={(e) => setStudentProfile({ ...studentProfile, classId: e.target.value })}
+              className="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono text-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {status === 'running' ? (
+            <button
+              onClick={finishExam}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg"
+            >
+              {moodBanner} (點此交卷)
+            </button>
+          ) : (
+            <button
+              onClick={() => setStatus('confirm_modal')}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 font-black text-xs shadow-lg"
+            >
+              逐行看打 (開始測驗)
+            </button>
+          )}
+
+          <button
+            onClick={onBack}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+          >
+            離開
+          </button>
+        </div>
+      </div>
+
+      {/* 主看打區域 vs 成績檢視報告 */}
+      {status !== 'report' ? (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-5 shadow-xl">
+          {/* 逐行看打輸入框列表 */}
+          <div className="space-y-4 max-h-[440px] overflow-y-auto pr-1">
+            {targetLines.map((lineText, idx) => {
+              const isCurrent = status === 'running' && activeLineIdx === idx;
+              const typed = typedLines[idx] || '';
+
+              return (
+                <div
+                  key={idx}
+                  className={`p-3.5 rounded-xl border transition ${
+                    isCurrent
+                      ? 'bg-slate-950/95 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.15)]'
+                      : 'bg-slate-950/50 border-slate-800/80'
+                  }`}
+                >
+                  {/* 奇數行：原始題目行 (帶即時字元對錯高亮輔助) */}
+                  <div className="font-mono text-base sm:text-lg tracking-wide select-none mb-2 flex items-center gap-2">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-bold">
+                      {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <div className="flex flex-wrap">
+                      {Array.from(lineText).map((ch, cIdx) => {
+                        const uCh = typed[cIdx];
+                        let cls = 'text-emerald-300';
+                        if (uCh !== undefined) {
+                          cls = uCh === ch ? 'text-cyan-300 font-bold' : 'bg-rose-500/30 text-rose-300 underline';
+                        }
+                        return (
+                          <span key={cIdx} className={cls}>
+                            {ch === ' ' ? '\u00A0' : ch}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 偶數行：學生看打輸入框 (打完一行按 Enter 跳下一行) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-1.5 py-0.5 text-transparent select-none">00</span>
+                    <input
+                      ref={(el) => (lineInputRefs.current[idx] = el)}
+                      type="text"
+                      disabled={status !== 'running'}
+                      value={typed}
+                      onFocus={() => setActiveLineIdx(idx)}
+                      onCompositionStart={() => setIsComposing(true)}
+                      onCompositionEnd={() => setIsComposing(false)}
+                      onChange={(e) => {
+                        soundEngine.playClick();
+                        const val = e.target.value;
+                        setCursorCol(val.length + 1);
+                        setTypedLines((prev) => {
+                          const copy = [...prev];
+                          copy[idx] = val;
+                          return copy;
+                        });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !isComposing) {
+                          e.preventDefault();
+                          if (idx < targetLines.length - 1) {
+                            const nextIdx = idx + 1;
+                            setActiveLineIdx(nextIdx);
+                            setCursorCol((typedLines[nextIdx] || '').length + 1);
+                            lineInputRefs.current[nextIdx]?.focus();
+                          } else {
+                            // 最後一行按 Enter 直接交卷結算 (還原影片 04:53 行為)
+                            finishExam();
+                          }
+                        }
+                      }}
+                      placeholder={status === 'running' ? '在此逐行輸入，打完本行請按【Enter】跳下一行...' : ''}
+                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-lg px-3 py-1.5 font-mono text-base sm:text-lg text-white outline-none"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 說明區 (還原影片 03:35 下方規則說明) */}
+          {status === 'idle' && (
+            <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
+              <p className="text-cyan-300 font-bold">
+                ※ {connectionMode === 'teacher_sync' ? `連線模式：成績將自動回傳至教師收集器 (${studentProfile.roomCode})` : '個人學習：【學號、姓名、班級】內定為本機紀錄，亦可開啟右上角與老師連線。'}
+              </p>
+              <p>1. 每打完一行，按【Enter】跳下一行；完成最後一行輸入，按【Enter】確認交卷。</p>
+              <p>2. 採<strong className="text-amber-300">智慧交叉評分</strong>，可以不用對齊，【多打、漏打或打錯】不會整行連環扣分。</p>
+              <p className="text-emerald-300 font-bold">3. 按右上角「逐行看打」開始挑戰！</p>
+            </div>
+          )}
+
+          {/* 底部狀態列：行號-字元游標位置、提前結束按鈕、計時器 (還原影片 04:00 左下角 `1 - 34` 與右下角計時) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="px-3 py-1 rounded-lg bg-slate-950 border border-emerald-500/40 font-mono text-xs font-bold text-emerald-300">
+                行 {activeLineIdx + 1} - 字 {cursorCol}
+              </div>
+              {status === 'running' && (
+                <button
+                  onClick={finishExam}
+                  className="px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition"
+                >
+                  Alt+F12 提前結束並計算成績
+                </button>
+              )}
+            </div>
+
+            <div className="px-4 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 font-mono text-base font-black text-amber-300">
+              計時 {String(Math.floor(timeLeft / 60)).padStart(2, '0')} : {String(timeLeft % 60).padStart(2, '0')}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ====================================================================
+           成績檢視報告 (100% 還原影片 04:55 ~ 05:13 智慧交叉比對報告 + 現代彩色視覺化)
+           ==================================================================== */
+        examReport && (
+          <div className="bg-slate-900 border-2 border-cyan-400/70 rounded-2xl p-4 sm:p-6 space-y-5 shadow-2xl">
+            {/* 頂部提示說明區 (對應影片 04:56 符號說明) */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span className="font-black text-white text-base">
+                    【成績檢視】測驗題庫：{lesson.title}
+                  </span>
+                </div>
+                <p className="text-xs font-mono text-slate-300 leading-relaxed">
+                  打錯的字以「<strong className="text-rose-400">*</strong>」表示、
+                  漏打的字以「<strong className="text-amber-400">-</strong>」表示、
+                  多打的字以「<strong className="text-purple-400">+</strong>」表示、
+                  最後一行打的位置以「<strong className="text-cyan-400">← 或 ▽</strong>」表示、
+                  顛倒打的字以「<strong className="text-pink-400">@@</strong>」表示
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start md:self-center">
+                <button
+                  onClick={launchExam}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs"
+                >
+                  再測驗一次
+                </button>
+                <button
+                  onClick={() => setStatus('idle')}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+                >
+                  離開報告
+                </button>
+              </div>
+            </div>
+
+            {/* 逐行交叉比對明細區 (點擊任一行可在下方檢視原本實際打出的字串，還原影片 05:00 點選反白與下方顯示區) */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4 max-h-[380px] overflow-y-auto font-mono text-sm">
+              {examReport.lineResults.map((lr, idx) => {
+                const isSelected = selectedReportLineIdx === idx;
+                return (
+                  <div
+                    key={lr.lineNo}
+                    onClick={() => setSelectedReportLineIdx(idx)}
+                    className={`p-3 rounded-xl border cursor-pointer transition space-y-1.5 ${
+                      isSelected
+                        ? 'bg-blue-950/60 border-cyan-400'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    {/* 第一行：原始題目行 */}
+                    <div className="text-slate-300 whitespace-pre-wrap break-all">
+                      <span className="text-slate-500 mr-2">{String(lr.lineNo).padStart(2, '0')}</span>
+                      {lr.targetText}
+                    </div>
+
+                    {/* 第二行：智慧對齊後的標記行 (含 * - + @@ ← 與彩色高亮) */}
+                    <div className="whitespace-pre-wrap break-all">
+                      <span className="text-slate-500 mr-2">{String(lr.lineNo).padStart(2, '0')}</span>
+                      {lr.tokens.length > 0 ? (
+                        lr.tokens.map((tk, tIdx) => {
+                          if (tk.type === 'match') {
+                            return <span key={tIdx} className="text-emerald-400">{tk.uChar}</span>;
+                          }
+                          if (tk.type === 'sub') {
+                            return (
+                              <span key={tIdx} className="bg-rose-500/30 text-rose-300 font-black px-0.5 rounded" title={`應打「${tk.tChar}」，誤打為「${tk.uChar}」`}>
+                                *
+                              </span>
+                            );
+                          }
+                          if (tk.type === 'transposed') {
+                            return (
+                              <span key={tIdx} className="bg-pink-500/30 text-pink-300 font-black px-0.5 rounded" title={`相鄰顛倒：應打「${tk.tChar}」，誤打為「${tk.uChar}」`}>
+                                @
+                              </span>
+                            );
+                          }
+                          if (tk.type === 'missing') {
+                            return (
+                              <span key={tIdx} className="bg-amber-500/30 text-amber-300 font-black px-0.5 rounded" title={`漏打「${tk.tChar}」`}>
+                                -
+                              </span>
+                            );
+                          }
+                          return (
+                            <span key={tIdx} className="bg-purple-500/30 text-purple-300 font-black px-0.5 rounded" title={`多打「${tk.uChar}」`}>
+                              +
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-slate-600 italic">(本行未輸入)</span>
+                      )}
+                      {lr.alignedTypedLine.endsWith('←') && (
+                        <span className="text-cyan-400 font-black ml-1">←</span>
+                      )}
+                    </div>
+
+                    {/* 第三行：單行統計列 (`*打對: 52  打錯: 1  漏打: 0  多打: 0  得分: 50  L:3`) */}
+                    <div className="text-xs pt-1 border-t border-slate-800/80 flex flex-wrap gap-4 text-slate-300">
+                      <span>*打對: <strong className="text-emerald-400">{lr.correct}</strong></span>
+                      <span>打錯: <strong className="text-rose-400">{lr.wrong}</strong></span>
+                      <span>漏打: <strong className="text-amber-400">{lr.missing}</strong></span>
+                      <span>多打: <strong className="text-purple-400">{lr.extra}</strong></span>
+                      <span>得分: <strong className="text-cyan-300">{lr.score}</strong></span>
+                      <span className="ml-auto text-slate-400">L:{lr.lineNo}</span>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* 總結橫幅 (還原影片 04:55 `★ 平均速度：243字/分 錯誤率：4/267=2% 測驗時間:1分 2秒`) */}
+              <div className="p-3.5 rounded-xl bg-cyan-950/80 border border-cyan-400/60 text-cyan-200 font-bold text-sm flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  ★ 平均速度：{examReport.cpm} 字/分 　錯誤率：{examReport.totalMistakes}/{examReport.totalCorrect + examReport.totalMistakes}={examReport.errorRate}% 　測驗時間：{Math.floor(examReport.usedSec / 60)}分 {examReport.usedSec % 60}秒
+                </span>
+                <span className="text-amber-300">總得分：{examReport.totalScore} 分</span>
+              </div>
+            </div>
+
+            {/* 底部實際原始打字對照檢視窗 (還原影片 05:01 點擊某行時下方顯示學生原本打出的未遮罩字元) */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs space-y-1">
+              <div className="text-slate-400">
+                {selectedReportLineIdx !== null
+                  ? `第 ${selectedReportLineIdx + 1} 行您實際輸入的原始字串對照：`
+                  : '提示：點擊上方任一行的統計列，可在此檢視您該行原本輸入的原始文字：'}
+              </div>
+              <div className="text-amber-300 text-sm font-bold min-h-[24px]">
+                {selectedReportLineIdx !== null
+                  ? examReport.lineResults[selectedReportLineIdx]?.typedText || '(空白)'
+                  : '---'}
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* 開始看打前的規則確認彈窗 (100% 還原影片 03:49 彈窗) */}
+      {status === 'confirm_modal' && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border-2 border-cyan-400 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-lg font-black text-cyan-300 flex items-center gap-2">
+              <Timer className="w-5 h-5" />
+              <span>逐行看打測驗提示</span>
+            </h3>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 text-xs sm:text-sm text-slate-200 leading-relaxed">
+              <p>● 計時 <strong className="text-amber-300">{durationMin} 分鐘</strong>，按左上方【逐行看打】開始測驗。</p>
+              <p>● 大小寫切換：按左方【CapsLock】或【Shift】鍵。</p>
+              <p>● 智慧評分：讀入一行題目，在下方輸入，隨時可修改。</p>
+              <p>● 打完一行，按【Enter】跳下一行；最後一行，按【Enter】結束。</p>
+              <p className="text-emerald-300 font-semibold">● 打字常有「多打、漏打、錯字…」，本系統採用【智慧、交叉比對】方式能夠【正確評分】！</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setStatus('idle')}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+              >
+                取消
+              </button>
+              <button
+                onClick={launchExam}
+                className="px-6 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs"
+              >
+                確定開始 (Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 13. 同目錄外部題庫動態管理與熱掛載中心 (滿足第 2 點要求：同目錄建置、動態載入與擴充)
+// ============================================================================
+function QuestionBankModal({ manifest, banks, loadStatus, onClose, onHotMountFiles, onAddCustomLesson }) {
+  const [targetCatId, setTargetCatId] = useState('en_articles');
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newContent, setNewContent] = useState('');
+  const [savedNotice, setSavedNotice] = useState('');
+
+  // 匯出單一或全部題庫為同目錄標準 JSON 檔案
+  const handleExportJson = (catId) => {
+    const data = catId === 'manifest' ? manifest : banks[catId];
+    const filename = catId === 'manifest' ? 'manifest.json' : `bank_${catId}.json`;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCreateLesson = (e) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim()) return;
+    const lines = newContent.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const words = lines.join(' ').split(/\s+/).filter(Boolean);
+    const keys = Array.from(new Set(lines.join('').split('')));
+    const targetBank = banks[targetCatId];
+    const code = `CUST-${(targetBank?.lessons?.length || 0) + 1}`;
+
+    onAddCustomLesson(targetCatId, {
+      id: code,
+      code,
+      title: `${code}: ${newTitle.trim()}`,
+      description: newDesc.trim() || '教師自訂擴充課程',
+      requiresShiftHint: false,
+      keys,
+      words,
+      lines
+    });
+
+    setNewTitle('');
+    setNewDesc('');
+    setNewContent('');
+    setSavedNotice(`已成功新增「${code}: ${newTitle}」至 ${targetBank?.categoryTitle}！`);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border-2 border-cyan-500/60 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+              <Database className="w-5 h-5 text-cyan-400" />
+              <span>同目錄題庫動態載入與擴充中心 (Same-Directory Asset Architecture)</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              無論英打、中打注音或看打文章，統一存放於應用程式同目錄下（`./manifest.json` 與 `./bank_*.json`），支援熱掛載與無限擴充
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+          >
+            關閉
+          </button>
+        </div>
+
+        {/* 同目錄檔案結構與熱掛載區 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-cyan-300 uppercase">同目錄題庫檔案清單 (`./`)</span>
+              <button
+                onClick={() => handleExportJson('manifest')}
+                className="text-[11px] text-amber-300 hover:underline flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> 下載 manifest.json
+              </button>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {manifest.categories.map((cat) => (
+                <div
+                  key={cat.id}
+                  className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs"
+                >
+                  <div>
+                    <div className="font-bold text-slate-200">{cat.title}</div>
+                    <div className="font-mono text-[11px] text-cyan-400">{cat.file} ({banks[cat.id]?.lessons?.length || 0} 課)</div>
+                  </div>
+                  <button
+                    onClick={() => handleExportJson(cat.id)}
+                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1"
+                  >
+                    <Download className="w-3 h-3" /> 匯出 JSON
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 動態熱掛載本機同目錄檔案 */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-emerald-300 uppercase block">
+                動態掛載同目錄題庫檔 (`.json` / `.txt`)
+              </span>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                在部署目錄下放入新的 `bank_*.json` 或純文字文章 `.txt`，系統啟動時會透過 `fetch(manifestUrl)` 自動載入；您也可以直接點選下方按鈕選取本機檔案立即熱掛載！
+              </p>
+              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-[11px] text-cyan-300">
+                狀態：{loadStatus.lastSync}
+              </div>
+            </div>
+
+            <label className="cursor-pointer w-full py-3 px-4 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border-2 border-dashed border-emerald-500/50 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition">
+              <Upload className="w-4 h-4" />
+              <span>選取本機同目錄 `.json` 或 `.txt` 題庫檔立即載入</span>
+              <input
+                type="file"
+                multiple
+                accept=".json,.txt"
+                onChange={onHotMountFiles}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* 快速線上新增自訂課程/文章並可匯出回存至同目錄 */}
+        <form onSubmit={handleCreateLesson} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold uppercase text-amber-300 flex items-center gap-1.5">
+              <Plus className="w-4 h-4" />
+              <span>快速新增擴充題庫 (新增後自動支援四大模式練習，並可匯出 JSON 存回同目錄)</span>
+            </h4>
+            {savedNotice && <span className="text-xs text-emerald-400 font-bold">{savedNotice}</span>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">歸屬題庫分類</label>
+              <select
+                value={targetCatId}
+                onChange={(e) => setTargetCatId(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-bold text-white"
+              >
+                {manifest.categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">新課程標題</label>
+              <input
+                type="text"
+                placeholder="例如：五年級英文單字 Unit 1"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">課程說明</label>
+              <input
+                type="text"
+                placeholder="例如：課本第 12~15 頁核心句型"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">
+              題庫內容（每行代表「逐行看打」的一行；系統會自動拆解出「單字」與「字元」供另外三個遊戲模式使用）
+            </label>
+            <textarea
+              rows={3}
+              placeholder="請貼上英文句子、單字清單或中文短文（每行一句）..."
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono text-white"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs"
+            >
+              加入題庫並立即啟用
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 14. 方案 C 預留架構：教師連線與全班成績收集器面板 (TeacherSyncService UI)
+// ============================================================================
+function TeacherSyncModal({
+  connectionMode,
+  setConnectionMode,
+  studentProfile,
+  setStudentProfile,
+  scoreHistory,
+  banks,
+  onDispatchLesson,
+  onClose
+}) {
+  const [dispatchCat, setDispatchCat] = useState('en_finger');
+  const [dispatchLesson, setDispatchLesson] = useState('Q-4');
+
+  const exportCsvScores = () => {
+    const headers = ['時間,學生,模式,課程代號,速度,錯誤率,得分,同步狀態'];
+    const rows = scoreHistory.map(
+      (r) => `${r.timestamp},"${r.student}",${r.mode},${r.lesson},${r.speed},${r.errorRate},${r.score},${r.synced ? '已同步' : '本機'}`
+    );
+    const csvContent = '\uFEFF' + headers.concat(rows).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `校園打字專家_成績收集器_${studentProfile.classId}班.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border-2 border-emerald-500/60 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-5">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-400" />
+              <span>方案 C 預留架構：教師端連線派題與成績收集器 (`TeacherSyncService`)</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              採用抽象化 Adapter 設計，可無縫切換「單機 LocalStorage」與「區域網路 WebSocket / 雲端 Firebase / Google 試算表後端」
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+          >
+            關閉
+          </button>
+        </div>
+
+        {/* 連線狀態切換與設定 */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-bold text-emerald-300 uppercase">目前通訊協定狀態</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConnectionMode('standalone')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                  connectionMode === 'standalone'
+                    ? 'bg-cyan-400 text-slate-950'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                單機模式 (LocalStorage)
+              </button>
+              <button
+                onClick={() => setConnectionMode('teacher_sync')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                  connectionMode === 'teacher_sync'
+                    ? 'bg-emerald-400 text-slate-950'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                與老師連線 (WebSocket / REST 收集器)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">教師端伺服器 Endpoint (升級方案 C 時直接指向後端網址)</label>
+              <input
+                type="text"
+                value={studentProfile.serverUrl}
+                onChange={(e) => setStudentProfile({ ...studentProfile, serverUrl: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-cyan-300"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">教室房間代碼 (Room Code)</label>
+              <input
+                type="text"
+                value={studentProfile.roomCode}
+                onChange={(e) => setStudentProfile({ ...studentProfile, roomCode: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-emerald-300"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 模擬教師端一鍵統一下發指定測驗題庫 */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+          <span className="text-xs font-bold text-amber-300 uppercase block">
+            教師端模擬控制：一鍵派發指定題庫給學生端
+          </span>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select
+              value={dispatchCat}
+              onChange={(e) => {
+                setDispatchCat(e.target.value);
+                const first = banks[e.target.value]?.lessons?.[0]?.id || '';
+                setDispatchLesson(first);
+              }}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-bold text-white"
+            >
+              {Object.values(banks).map((b) => (
+                <option key={b.categoryId} value={b.categoryId}>{b.categoryTitle}</option>
+              ))}
+            </select>
+            <select
+              value={dispatchLesson}
+              onChange={(e) => setDispatchLesson(e.target.value)}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-bold text-cyan-300"
+            >
+              {banks[dispatchCat]?.lessons?.map((l) => (
+                <option key={l.id} value={l.id}>{l.title}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => onDispatchLesson(dispatchCat, dispatchLesson)}
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>立即派題至學生端</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 教師端成績收集器列表與 CSV 匯出 (對應原版「校園打字成績收集器.exe」) */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-cyan-300 uppercase">
+              校園打字成績收集器 ({scoreHistory.length} 筆紀錄)
+            </span>
+            <button
+              onClick={exportCsvScores}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>匯出全班成績單 (.CSV)</span>
+            </button>
+          </div>
+
+          <div className="max-h-48 overflow-y-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400">
+                  <th className="py-1.5 px-2">時間</th>
+                  <th className="py-1.5 px-2">班級-學號-姓名</th>
+                  <th className="py-1.5 px-2">模式</th>
+                  <th className="py-1.5 px-2">課程</th>
+                  <th className="py-1.5 px-2 text-right">速度</th>
+                  <th className="py-1.5 px-2 text-right">錯誤率</th>
+                  <th className="py-1.5 px-2 text-right">得分</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                {scoreHistory.map((r) => (
+                  <tr key={r.id}>
+                    <td className="py-1.5 px-2 text-slate-400">{r.timestamp}</td>
+                    <td className="py-1.5 px-2 text-white font-sans font-semibold">{r.student}</td>
+                    <td className="py-1.5 px-2 text-cyan-300 font-sans">{r.mode}</td>
+                    <td className="py-1.5 px-2">{r.lesson}</td>
+                    <td className="py-1.5 px-2 text-right text-emerald-300">{r.speed}</td>
+                    <td className="py-1.5 px-2 text-right text-rose-300">{r.errorRate}</td>
+                    <td className="py-1.5 px-2 text-right text-amber-300 font-bold">{r.score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

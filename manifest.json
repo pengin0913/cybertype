@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "appName": "校園打字專家：電競重構版 (CyberType Academy)",
+  "description": "同目錄外部題庫索引檔 — 新增題庫檔案後在此註冊，或透過系統內建「掛載同目錄檔案」動態載入",
+  "categories": [
+    {
+      "id": "en_finger",
+      "title": "英打【鍵盤指法】",
+      "lang": "en",
+      "type": "finger",
+      "file": "./bank_en_finger.json"
+    },
+    {
+      "id": "zh_bopomofo",
+      "title": "中打【鍵盤注音】",
+      "lang": "zh-bopomofo",
+      "type": "finger",
+      "file": "./bank_zh_bopomofo.json"
+    },
+    {
+      "id": "en_vocab_elem",
+      "title": "國小【英文字根字詞】",
+      "lang": "en",
+      "type": "vocab",
+      "file": "./bank_en_vocab_elem.json"
+    },
+    {
+      "id": "en_vocab_junior",
+      "title": "國中【英文字根字詞】",
+      "lang": "en",
+      "type": "vocab",
+      "file": "./bank_en_vocab_junior.json"
+    },
+    {
+      "id": "en_articles",
+      "title": "英打【精選文章看打】",
+      "lang": "en",
+      "type": "article",
+      "file": "./bank_en_articles.json"
+    },
+    {
+      "id": "zh_articles",
+      "title": "中打【精選文章看打】",
+      "lang": "zh",
+      "type": "article",
+      "file": "./bank_zh_articles.json"
+    }
+  ]
+}
